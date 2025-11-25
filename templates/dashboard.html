@@ -1,0 +1,29 @@
+
+{% extends "base.html" %}
+{% block header_title %}Panel de Control - Farmacia{% endblock %}
+{% block content %}
+<div class="dashboard-cards">
+  <div class="card" style="text-align:center">
+    <i class="fas fa-pills" style="font-size:40px;color:#4CAF50;margin-bottom:10px;"></i>
+    <h3>Total Productos</h3>
+    <p style="font-size:28px;font-weight:bold;">{{ total_items }}</p>
+  </div>
+  <div class="card" style="text-align:center">
+    <i class="fas fa-shopping-cart" style="font-size:40px;color:#4CAF50;margin-bottom:10px;"></i>
+    <h3>Ventas Hoy</h3>
+    <p style="font-size:28px;font-weight:bold;">\$ {{ '%.2f'|format(today_sales) }}</p>
+  </div>
+  <div class="card" style="text-align:center">
+    <i class="fas fa-exclamation-triangle" style="font-size:40px;color:#4CAF50;margin-bottom:10px;"></i>
+    <h3>Stock Bajo</h3>
+    <p style="font-size:28px;font-weight:bold;">{{ low_stock }}</p>
+  </div>
+  <div class="card" style="text-align:center">
+    <i class="fas fa-file-invoice" style="font-size:40px;color:#4CAF50;margin-bottom:10px;"></i>
+    <h3>Recibos</h3>
+    <p style="font-size:28px;font-weight:bold;">{{ receipts_count }}</p>
+  </div>
+</div>
+
+<!-- Inventario de Medicamentos removido para simplificar el dashboard -->
+{% endblock %}

@@ -1,0 +1,85 @@
+/* Sales Page Specific Styles */
+
+/* Grid Layout */
+.grid-sales {
+  min-height: calc(100vh - var(--header-height) - 2rem);
+}
+
+/* Status Indicators */
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.status-success {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.status-warning {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+.status-danger {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+/* Cart Styling */
+.cart-panel {
+  position: sticky;
+  top: var(--header-height);
+  max-height: calc(100vh - var(--header-height) - 2rem);
+  overflow-y: auto;
+}
+
+.cart-item:hover {
+  background: var(--gray-50);
+}
+
+.cart-item:last-child {
+  border-bottom: none;
+}
+
+/* Table Improvements */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--gray-200);
+  border-radius: 0.5rem;
+}
+
+table {
+  margin: 0;
+}
+
+/* Search Bar */
+.search-bar .form-control {
+  transition: all 0.3s ease;
+}
+
+.search-bar .form-control:focus {
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Total Section Animation */
+.total-section {
+  transition: transform 0.3s ease;
+}
+
+.total-section:hover {
+  transform: scale(1.02);
+}
+
+/* Modal Animation */
+[x-show="showConfirm"] {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}

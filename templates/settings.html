@@ -1,0 +1,23 @@
+
+{% extends "base.html" %}
+{% block header_title %}Configuración{% endblock %}
+{% block content %}
+<div class="content-section">
+  <div class="section-header"><h2>Preferencias</h2></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr; gap:12px;">
+    <div class="form-group"><label>Nombre de la farmacia</label><input class="form-control" value="FarmaSys Demo"></div>
+    <div class="form-group"><label>Moneda</label><input class="form-control" value="MXN"></div>
+    <div class="form-group"><label>RFC / Datos fiscales</label><input class="form-control" value="XAXX010101000"></div>
+    <div class="form-group"><label>Dirección</label><input class="form-control" value="Calle Ejemplo 123, CDMX"></div>
+    <div class="form-group"><label>Teléfono</label><input class="form-control" value="555-123-4567"></div>
+    <div class="form-group"><label>Correo de contacto</label><input class="form-control" value="contacto@farmasys.com"></div>
+    <div class="form-group"><label>Impresión automática de ticket</label>
+      <select class="form-control"><option>Sí</option><option>No</option></select>
+    </div>
+    <div class="form-group"><label>Cambiar contraseña</label>
+      <input class="form-control" type="password" placeholder="Nueva contraseña">
+    </div>
+  </div>
+  <p class="muted" style="margin-top:10px;">Estos campos no guardan cambios en la demo.</p>
+</div>
+{% endblock %}

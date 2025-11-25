@@ -1,0 +1,22 @@
+
+{% extends "base.html" %}
+{% block header_title %}Reportes{% endblock %}
+{% block content %}
+<div class="content-section">
+  <div class="section-header"><h2>Ventas últimos 7 días</h2></div>
+  <canvas id="sales7" height="140"></canvas>
+</div>
+<div class="content-section">
+  <div class="section-header"><h2>Top productos por unidades</h2></div>
+  <canvas id="topProducts" height="140"></canvas>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const labels={{ labels|tojson }}; const values={{ values|tojson }};
+const tlabels={{ top_labels|tojson }}; const tvalues={{ top_values|tojson }};
+
+new Chart(document.getElementById('sales7'), { type:'line', data:{ labels, datasets:[{label:'Ventas', data: values}] }, options:{ responsive:true }});
+new Chart(document.getElementById('topProducts'), { type:'bar', data:{ labels: tlabels, datasets:[{label:'Unidades', data: tvalues}] }, options:{ responsive:true }});
+</script>
+{% endblock %}

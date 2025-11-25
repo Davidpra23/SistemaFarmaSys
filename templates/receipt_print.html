@@ -1,0 +1,269 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recibo - FarmaSys</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --secondary: #10B981;
+      --gray-100: #F3F4F6;
+      --gray-200: #E5E7EB;
+      --gray-600: #4B5563;
+      --gray-700: #374151;
+      --gray-800: #1F2937;
+    }
+    
+    body { 
+      background: var(--gray-100);
+      padding: 2rem;
+      font-family: 'Poppins', sans-serif;
+      line-height: 1.5;
+      color: var(--gray-800);
+    }
+
+    .receipt-container {
+      background: white;
+      max-width: 380px;
+      margin: 0 auto;
+      border-radius: 1rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+
+    .receipt-header {
+      background: var(--primary);
+      color: white;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .receipt-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .receipt-header span {
+      color: var(--secondary);
+    }
+
+    .receipt-header p {
+      margin: 0.5rem 0 0;
+      font-size: 0.875rem;
+      opacity: 0.9;
+    }
+
+    .receipt-body {
+      padding: 1.5rem;
+    }
+
+    .receipt-info {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px dashed var(--gray-200);
+    }
+
+    .receipt-info div {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .receipt-info label {
+      color: var(--gray-600);
+      font-weight: 500;
+    }
+
+    .receipt-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-bottom: 1rem;
+    }
+
+    .receipt-table th {
+      padding: 0.75rem;
+      text-align: left;
+      font-weight: 500;
+      color: var(--gray-600);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .receipt-table td {
+      padding: 0.75rem;
+      color: var(--gray-700);
+      font-size: 0.875rem;
+      border-bottom: 1px solid var(--gray-100);
+    }
+
+    .receipt-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .receipt-total {
+      background: var(--gray-100);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      color: var(--gray-800);
+    }
+
+    .receipt-total .label {
+      font-size: 0.875rem;
+    }
+
+    .receipt-total .amount {
+      font-size: 1.25rem;
+      color: var(--primary);
+    }
+
+    .receipt-footer {
+      padding: 1.5rem;
+      text-align: center;
+      border-top: 1px dashed var(--gray-200);
+    }
+
+    .receipt-footer p {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--gray-600);
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: white;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4338CA;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--gray-700);
+      border: 1px solid var(--gray-200);
+    }
+
+    .btn-secondary:hover {
+      background: var(--gray-100);
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+
+      .receipt-container {
+        box-shadow: none;
+      }
+
+      .actions {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-container">
+    <div class="receipt-header">
+      <h1>Farma<span>Sys</span></h1>
+      <p>Recibo de Venta</p>
+    </div>
+
+    <div class="receipt-body">
+      <div class="receipt-info">
+        <div>
+          <label>Fecha:</label>
+          <span>{{ r['datetime'].replace('T',' ')[:19] }}</span>
+        </div>
+        <div>
+          <label>Folio:</label>
+          <span>{{ r['id'][:8] }}</span>
+        </div>
+        {% if r.get('customer') %}
+        <div>
+          <label>Cliente:</label>
+          <span>{{ r['customer'] }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <table class="receipt-table">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th style="text-align:center">Cant.</th>
+            <th style="text-align:right">Precio</th>
+            <th style="text-align:right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in r['items'] %}
+          <tr>
+            <td>{{ it['name'] }}</td>
+            <td style="text-align:center">{{ it['qty'] }}</td>
+            <td style="text-align:right">$ {{ '%.2f'|format(it['price']) }}</td>
+            <td style="text-align:right">$ {{ '%.2f'|format(it['subtotal']) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="receipt-total">
+      <span class="label">Total</span>
+      <span class="amount">$ {{ '%.2f'|format(r.total) }}</span>
+    </div>
+
+    <div class="receipt-footer">
+      <p>¡Gracias por su compra!</p>
+      <p>FarmaSys - Su farmacia de confianza</p>
+      <p>www.farmasys.com</p>
+    </div>
+
+    <div class="actions">
+      <a href="/receipts" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i>
+        Volver
+      </a>
+      <button class="btn btn-primary" onclick="window.print()">
+        <i class="fas fa-print"></i>
+        Imprimir
+      </button>
+    </div>
+  </div>
+</body>
+</html>
