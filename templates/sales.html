@@ -1,221 +1,378 @@
-</div>
+{% extends "base.html" %}
 
-<!-- Scanner Section -->
-<div class="scanner-section"
-  style="margin-bottom: 1.5rem; background: black; border-radius: 0.5rem; overflow: hidden; position: relative;">
-  <div id="reader" style="width: 100%; min-height: 250px;"></div>
-  <div id="scan-status"
-    style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: white; padding: 0.5rem; text-align: center; display: none;">
-    <i class="fas fa-check-circle"></i> Producto agregado
-  </div>
-</div>
+{% block title %}Punto de Venta{% endblock %}
 
-<!-- Barra de búsqueda mejorada -->
-<div class="search-bar" style="margin-bottom: 1.5rem;">
-  <div class="form-group" style="position: relative;">
-    <label><i class="fas fa-search"></i> Buscar Producto</label>
-    <input class="form-control" placeholder="Buscar por nombre o código..." x-model="q" style="padding-left: 2.5rem;"
-      @keydown.enter="if(filtered().length === 1) add(filtered()[0])">
-    <i class="fas fa-search" style="position: absolute; left: 1rem; top: 2.75rem; color: var(--gray-400);"></i>
-  </div>
-</div>
+{% block content %}
+<div x-data="salesPOS()" x-init="init()" class="container-fluid p-4">
 
-<!-- Tabla de productos con mejor diseño -->
-<div class="table-container" style="margin-bottom: 1.5rem;">
-  <table>
-    <thead>
-      <tr>
-        <th>Producto</th>
-        <th>Precio</th>
-        <th>Stock</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      <template x-for="p in filtered()" :key="p.id">
-        <tr>
-          <td>
-            <div x-text="p.name" style="font-weight: 500;"></div>
-            <small x-text="p.sku" style="color: var(--gray-500);"></small>
-          </td>
-          <td>
-            <div class="price" style="color: var(--primary); font-weight: 600;">
-              $ <span x-text="p.price.toFixed(2)"></span>
-            </div>
-          </td>
-          <td>
-            <span class="status"
-              :class="p.stock > 10 ? 'status-success' : (p.stock > 0 ? 'status-warning' : 'status-danger')"
-              x-text="p.stock"></span>
-          </td>
-          <td>
-            <button class="btn btn-primary" @click="add(p)" :disabled="p.stock <= 0"
-              :title="p.stock <= 0 ? 'Sin stock disponible' : 'Agregar al carrito'">
-              <i class="fas fa-plus"></i>
-              <span x-show="p.stock > 0">Agregar</span>
-              <span x-show="p.stock <= 0">Sin Stock</span>
-            </button>
-          </td>
-        </tr>
-      </template>
-    </tbody>
-  </table>
-</div>
-</div>
+  <div class="row">
+    <!-- MITAD IZQUIERDA (50%): Escáner y Productos -->
+    <div class="col-md-6">
 
-<!-- Panel derecho: Carrito y checkout -->
-<div class="cart-panel" style="display: flex; flex-direction: column; gap: 1rem;">
-  <!-- Carrito -->
-  <div class="content-section">
-    <div class="section-header" style="margin-bottom: 1rem;">
-      <h2><i class="fas fa-shopping-cart"></i> Carrito</h2>
-      <button class="btn btn-secondary" @click="clearCart()" x-show="cart.length > 0">
-        <i class="fas fa-trash-alt"></i> Vaciar
-      </button>
-    </div>
+      <!-- 1. ESCÁNER (Cajita pequeña) -->
+      <div class="card bg-dark text-white shadow-sm mb-3 overflow-hidden" style="max-width: 240px;">
+        <div
+          class="card-body p-2 text-center position-relative d-flex justify-content-center align-items-center bg-black"
+          style="min-height: 220px;">
 
-    <div x-show="cart.length === 0" style="text-align: center; padding: 2rem; color: var(--gray-500);">
-      <i class="fas fa-shopping-cart" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-      <p>El carrito está vacío</p>
-    </div>
-
-    <template x-if="cart.length > 0">
-      <div class="cart-items" style="margin-bottom: 1rem;">
-        <template x-for="(it, idx) in cart" :key="it.id">
-          <div class="cart-item"
-            style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--gray-200);">
-            <div style="flex: 1;">
-              <div x-text="it.name" style="font-weight: 500;"></div>
-              <div style="color: var(--primary); font-size: 0.875rem;">
-                $ <span x-text="it.price.toFixed(2)"></span>
-              </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <input class="form-control" type="number" min="1" :max="getMaxStock(it.id)" x-model.number="it.qty"
-                style="width: 5rem;">
-              <button class="btn btn-secondary" @click="remove(idx)">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
+          <!-- Contenedor del lector -->
+          <div class="scanner-container">
+            <div id="reader"></div>
           </div>
-        </template>
-      </div>
-    </template>
-  </div>
 
-  <!-- Resumen y checkout -->
-  <div class="content-section" x-show="cart.length > 0">
-    <div style="margin-bottom: 1rem;">
-      <div class="form-group">
-        <label><i class="fas fa-user"></i> Cliente (opcional)</label>
-        <input class="form-control" x-model="customerName" placeholder="Nombre del cliente">
+          <!-- Botón para activar cámara manualmente -->
+          <div x-show="!scannerActive" class="position-absolute top-50 start-50 translate-middle w-100"
+            style="z-index: 20;">
+            <button class="btn btn-primary btn-sm shadow" @click="startScanner()">
+              <i class="fas fa-camera"></i> Activar
+            </button>
+          </div>
+
+          <!-- Mensaje de confirmación -->
+          <div id="scan-message"
+            style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: none; z-index: 10;">
+            <span class="badge bg-success p-1 fs-6 shadow">OK</span>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label><i class="fas fa-money-bill"></i> Método de Pago</label>
-        <select class="form-control" x-model="paymentMethod">
-          <option value="cash">Efectivo</option>
-          <option value="card">Tarjeta</option>
-        </select>
+
+      <!-- 2. LISTA DE PRODUCTOS (Debajo del escáner) -->
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3">
+          <!-- Buscador -->
+          <div class="input-group">
+            <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+            <input type="text" class="form-control border-start-0 bg-light" placeholder="Buscar por nombre o código..."
+              x-model="searchQuery" @keydown.enter="manualAdd()">
+            <button class="btn btn-outline-secondary" @click="searchQuery = ''" x-show="searchQuery">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body p-0" style="height: 450px; overflow-y: auto;">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th class="ps-4">Producto</th>
+                <th>Código</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th class="text-end pe-4">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr x-show="loading">
+                <td colspan="5" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status"></div>
+                  <p class="text-muted mt-2">Cargando inventario...</p>
+                </td>
+              </tr>
+
+              <template x-for="p in filteredProducts()" :key="p.id">
+                <tr :class="{'table-danger': p.stock <= 0, 'bg-light': p.stock <= 0}">
+                  <td class="ps-4">
+                    <div class="fw-bold text-truncate" style="max-width: 200px;" x-text="p.name"></div>
+                    <small class="text-muted" x-text="p.category"></small>
+                  </td>
+                  <td><span class="badge bg-light text-dark border font-monospace" x-text="p.sku"></span></td>
+                  <td class="fw-bold text-primary">$<span x-text="p.price.toFixed(2)"></span></td>
+                  <td>
+                    <span class="badge rounded-pill"
+                      :class="p.stock > 10 ? 'bg-success' : (p.stock > 0 ? 'bg-warning text-dark' : 'bg-danger')"
+                      x-text="p.stock > 0 ? p.stock : 'Agotado'"></span>
+                  </td>
+                  <td class="text-end pe-4">
+                    <button class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" @click="addToCart(p)"
+                      :disabled="p.stock <= 0" style="width: 32px; height: 32px; padding: 0;">
+                      <i class="fas fa-plus"></i>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+
+              <tr x-show="!loading && filteredProducts().length === 0">
+                <td colspan="5" class="text-center py-5 text-muted">
+                  <i class="fas fa-box-open fa-3x mb-3 text-secondary opacity-25"></i>
+                  <p>No se encontraron productos</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <div class="total-section"
-      style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-        <span>Subtotal:</span>
-        <span>$ <span x-text="total().toFixed(2)"></span></span>
-      </div>
-      <div
-        style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 600; color: var(--primary);">
-        <span>Total:</span>
-        <span>$ <span x-text="total().toFixed(2)"></span></span>
+    <!-- MITAD DERECHA (50%): Carrito -->
+    <div class="col-md-6">
+      <div class="card shadow h-100 border-0">
+        <div class="card-header bg-primary text-white py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Carrito</h5>
+            <button class="btn btn-sm btn-outline-light" @click="cart = []" x-show="cart.length > 0">
+              <i class="fas fa-trash-alt me-1"></i> Vaciar
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de Items del Carrito -->
+        <div class="card-body p-0 bg-light d-flex flex-column" style="height: calc(100vh - 280px); overflow-y: auto;">
+          <!-- Estado Vacío -->
+          <div x-show="cart.length === 0" class="text-center text-muted p-5 my-auto">
+            <div class="mb-3">
+              <i class="fas fa-receipt fa-4x text-secondary opacity-25"></i>
+            </div>
+            <h5>El carrito está vacío</h5>
+            <p class="small">Escanea un producto o selecciona de la lista.</p>
+          </div>
+
+          <!-- Items -->
+          <ul class="list-group list-group-flush flex-grow-1" x-show="cart.length > 0">
+            <template x-for="(item, index) in cart" :key="index">
+              <li class="list-group-item py-3 border-bottom">
+                <div class="d-flex justify-content-between mb-1">
+                  <span class="fw-bold text-dark" x-text="item.name"></span>
+                  <span class="fw-bold text-primary">$<span x-text="(item.price * item.qty).toFixed(2)"></span></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  <div class="input-group input-group-sm shadow-sm" style="width: 100px;">
+                    <button class="btn btn-outline-secondary" @click="updateQty(index, -1)">-</button>
+                    <input type="text" class="form-control text-center bg-white fw-bold" readonly x-model="item.qty">
+                    <button class="btn btn-outline-secondary" @click="updateQty(index, 1)">+</button>
+                  </div>
+                  <button class="btn btn-sm text-danger hover-bg-light rounded p-1" @click="cart.splice(index, 1)"
+                    title="Eliminar">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+              </li>
+            </template>
+          </ul>
+        </div>
+
+        <!-- Footer del Carrito (Totales y Botón) -->
+        <div class="card-footer bg-white border-top p-4 shadow-lg" style="z-index: 5;">
+          <div class="d-flex justify-content-between mb-2 text-muted small">
+            <span>Artículos:</span>
+            <span class="fw-bold" x-text="cart.reduce((a, b) => a + b.qty, 0)"></span>
+          </div>
+          <div class="d-flex justify-content-between mb-4 align-items-end">
+            <span class="h4 mb-0 text-dark">Total:</span>
+            <span class="display-6 mb-0 text-primary fw-bold">$<span x-text="totalCart()"></span></span>
+          </div>
+
+          <button
+            class="btn btn-success w-100 py-3 fw-bold shadow-sm text-uppercase d-flex align-items-center justify-content-center gap-2"
+            @click="checkout()" :disabled="cart.length === 0 || processing">
+            <span x-show="!processing"><i class="fas fa-money-bill-wave"></i> Cobrar</span>
+            <span x-show="processing"><i class="fas fa-spinner fa-spin"></i> Procesando...</span>
+          </button>
+        </div>
       </div>
     </div>
-
-    <button class="btn btn-primary" style="width: 100%;" @click="checkout()" :disabled="processing">
-      <i class="fas fa-check"></i>
-      <span x-text="processing ? 'Procesando...' : 'Finalizar Venta'"></span>
-    </button>
   </div>
 </div>
-</div>
 
-<!-- Modal de Confirmación de Venta -->
-<div x-show="showConfirm"
-  style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50;">
-  <div class="content-section" style="width: 100%; max-width: 480px; margin: 1rem;"
-    @click.outside="showConfirm = false">
-    <h3 style="margin-bottom: 1rem;">
-      <i class="fas fa-check-circle" style="color: var(--secondary);"></i>
-      Venta Exitosa
-    </h3>
-    <p>La venta se ha procesado correctamente.</p>
-    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-      <button class="btn btn-secondary" @click="showConfirm = false">
-        <i class="fas fa-cart-plus"></i> Nueva Venta
-      </button>
-      <a :href="'/receipt/' + lastReceiptId" class="btn btn-primary">
-        <i class="fas fa-print"></i> Ver Recibo
-      </a>
-    </div>
-  </div>
-</div>
-</div>
-{% endblock %}
-{% block scripts %}
-<script>
-  // Inject server-side products into a global used by the static script
-  window.INIT_PRODUCTS = {{ products | tojson | safe }};
-</script>
-<script src="{{ url_for('static', filename='js/sales.js') }}"></script>
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-<script>
-  // Scanner Logic
-  document.addEventListener('DOMContentLoaded', function () {
-    const html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-    // Sound effect
-    const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-
-    const onScanSuccess = (decodedText, decodedResult) => {
-      // Prevent duplicate rapid scans of the same item if needed, 
-      // but for supermarket style we usually want to allow it.
-      // We'll add a small throttle to prevent double-reading the exact same frame.
-
-      // Visual feedback
-      const status = document.getElementById('scan-status');
-      status.innerHTML = `<i class="fas fa-check-circle"></i> ${product.name} agregado`;
-      status.style.display = 'block';
-      status.style.background = 'rgba(16, 185, 129, 0.9)'; // Green
-      setTimeout(() => status.style.display = 'none', 2000);
-    } else {
-      // Out of stock feedback
-      const status = document.getElementById('scan-status');
-    status.innerHTML = `<i class="fas fa-exclamation-circle"></i> Sin stock: ${product.name}`;
-    status.style.display = 'block';
-    status.style.background = 'rgba(239, 68, 68, 0.9)'; // Red
-    setTimeout(() => status.style.display = 'none', 2000);
+<!-- Estilos para mantener la cámara compacta y cuadrada -->
+<style>
+  .scanner-container {
+    width: 200px;
+    height: 200px;
+    overflow: hidden;
+    border-radius: 12px;
+    background: black;
+    border: 2px solid #555;
+    position: relative;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
   }
-      } else {
-      // Not found feedback
-      const status = document.getElementById('scan-status');
-      status.innerHTML = `<i class="fas fa-question-circle"></i> Producto no encontrado`;
-      status.style.display = 'block';
-      status.style.background = 'rgba(245, 158, 11, 0.9)'; // Orange
-      setTimeout(() => status.style.display = 'none', 2000);
-      }
-    };
 
-  html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-    .catch(err => {
-      console.error("Error starting scanner", err);
-      document.getElementById('reader').innerHTML =
-        '<div style="color:white; padding:2rem; text-align:center;">' +
-        '<i class="fas fa-camera-slash" style="font-size:2rem; margin-bottom:1rem;"></i><br>' +
-        'No se pudo acceder a la cámara.<br>Verifique los permisos.</div>';
-    });
-  });
+  #reader {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  #reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 12px;
+  }
+
+  .text-shadow {
+    text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.8);
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<script>
+  function salesPOS() {
+    return {
+      searchQuery: '',
+      products: [],
+      cart: [],
+      scanCooldown: false,
+      processing: false,
+      loading: true,
+      scannerActive: false,
+      html5QrCode: null,
+
+      async init() {
+        await this.loadProducts();
+        this.startScanner();
+      },
+
+      async loadProducts() {
+        this.loading = true;
+        try {
+          const response = await fetch('/api/inventory');
+          if (response.ok) {
+            this.products = await response.json();
+          } else {
+            console.error("Error al cargar inventario");
+            this.products = [];
+          }
+        } catch (e) {
+          console.error("Error de conexión", e);
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      async startScanner() {
+        if (this.html5QrCode) {
+          try {
+            await this.html5QrCode.stop();
+            await this.html5QrCode.clear();
+          } catch (err) { console.log(err); }
+        }
+
+        this.html5QrCode = new Html5Qrcode("reader");
+
+        const onScanSuccess = (decodedText, decodedResult) => {
+          if (this.scanCooldown) return;
+
+          let code = decodedText.trim();
+          let product = this.products.find(p => p.sku === code);
+
+          if (product) {
+            this.addToCart(product);
+            this.showFeedback(`✅ ${product.name}`, 'bg-success');
+            this.scanCooldown = true;
+            setTimeout(() => this.scanCooldown = false, 1500);
+          } else {
+            this.showFeedback(`❌ No encontrado: ${code}`, 'bg-danger');
+            this.scanCooldown = true;
+            setTimeout(() => this.scanCooldown = false, 2000);
+          }
+        };
+
+        const config = { fps: 10, qrbox: { width: 180, height: 180 }, aspectRatio: 1.0 };
+
+        this.html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+          .then(() => { this.scannerActive = true; })
+          .catch(err => {
+            console.error("Error iniciando cámara", err);
+            this.scannerActive = false;
+          });
+      },
+
+      filteredProducts() {
+        if (this.searchQuery === '') return this.products;
+        const q = this.searchQuery.toLowerCase();
+        return this.products.filter(p =>
+          p.name.toLowerCase().includes(q) ||
+          (p.sku && p.sku.includes(q))
+        );
+      },
+
+      addToCart(product) {
+        if (product.stock <= 0) {
+          this.showFeedback('⚠️ Sin Stock', 'bg-warning text-dark');
+          return;
+        }
+
+        let existing = this.cart.find(item => item.id === product.id);
+        if (existing) {
+          if (existing.qty < product.stock) {
+            existing.qty++;
+          } else {
+            this.showFeedback('⚠️ Stock Insuficiente', 'bg-warning text-dark');
+          }
+        } else {
+          this.cart.push({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            qty: 1,
+            stock: product.stock
+          });
+        }
+      },
+
+      updateQty(index, change) {
+        let item = this.cart[index];
+        let newQty = item.qty + change;
+        if (newQty > item.stock) {
+          this.showFeedback('⚠️ Máximo stock', 'bg-warning text-dark');
+          return;
+        }
+        if (newQty > 0) item.qty = newQty;
+        else this.cart.splice(index, 1);
+      },
+
+      manualAdd() {
+        let filtered = this.filteredProducts();
+        if (filtered.length === 1) {
+          this.addToCart(filtered[0]);
+          this.searchQuery = '';
+        }
+      },
+
+      totalCart() {
+        return this.cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2);
+      },
+
+      showFeedback(msg, bgClass) {
+        const el = document.getElementById('scan-message');
+        el.innerHTML = `<span class="badge ${bgClass} p-2 fs-6 shadow">${msg}</span>`;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 2000);
+      },
+
+      async checkout() {
+        this.processing = true;
+        try {
+          let res = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: this.cart,
+              customer: "Cliente Mostrador",
+              payment_method: "cash"
+            })
+          });
+
+          if (res.ok) {
+            let data = await res.json();
+            alert(`¡Venta Exitosa!\nRecibo ID: ${data.receipt_id}`);
+            await this.loadProducts();
+            this.cart = [];
+          } else {
+            alert("Error al procesar venta");
+          }
+        } catch (e) {
+          alert("Error de conexión");
+        } finally {
+          this.processing = false;
+        }
+      }
+    }
+  }
 </script>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/sales.css') }}">
 {% endblock %}
