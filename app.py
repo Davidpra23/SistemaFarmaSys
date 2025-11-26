@@ -9,10 +9,11 @@ app.secret_key = "dev-secret-change-me"
 
 # ------------------ Demo Data Stores (in-memory) ------------------
 INVENTORY = [
-    {"id": str(uuid.uuid4()), "name": "Paracetamol 500mg", "sku": "PARA500", "stock": 120, "price": 5.50, "expiry": "2026-01-15", "category": "Analgésico"},
-    {"id": str(uuid.uuid4()), "name": "Amoxicilina 250mg", "sku": "AMOX250", "stock": 42, "price": 8.75, "expiry": "2025-09-10", "category": "Antibiótico"},
-    {"id": str(uuid.uuid4()), "name": "Omeprazol 20mg", "sku": "OME20", "stock": 12, "price": 7.20, "expiry": "2025-12-01", "category": "Antiácido"},
-    {"id": str(uuid.uuid4()), "name": "Loratadina 10mg", "sku": "LORA10", "stock": 0, "price": 6.80, "expiry": "2027-02-01", "category": "Antialérgico"},
+    {"id": "1", "name": "Paracetamol 500mg", "sku": "750100010001", "stock": 120, "price": 5.50, "expiry": "2026-01-15", "category": "Analgésico"},
+    {"id": "2", "name": "Amoxicilina 250mg", "sku": "750100010002", "stock": 42, "price": 8.75, "expiry": "2025-09-10", "category": "Antibiótico"},
+    {"id": "3", "name": "Omeprazol 20mg", "sku": "750100010003", "stock": 12, "price": 7.20, "expiry": "2025-12-01", "category": "Antiácido"},
+    {"id": "4", "name": "Loratadina 10mg", "sku": "750100010004", "stock": 0, "price": 6.80, "expiry": "2027-02-01", "category": "Antialérgico"},
+    {"id": "5", "name": "Ibuprofeno 400mg", "sku": "750100010005", "stock": 50, "price": 4.50, "expiry": "2026-05-20", "category": "Analgésico"},
 ]
 
 RECEIPTS = []  # each receipt: {id, datetime, items: [{name, qty, price, subtotal}], total}
@@ -100,7 +101,17 @@ def reports():
 def settings():
     return render_template("settings.html")
 
+@app.route("/barcodes")
+@login_required
+def barcodes():
+    return render_template("barcodes.html", products=INVENTORY)
+
 # ------------------ API-ish endpoints for demo CRUD ------------------
+@app.get("/api/inventory")
+@login_required
+def api_get_inventory():
+    return jsonify(INVENTORY)
+
 @app.post("/api/inventory")
 @login_required
 def api_add_product():

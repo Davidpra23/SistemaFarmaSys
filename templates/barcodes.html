@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block header_title %}Catálogo de Códigos de Barras{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<style>
+    .barcode-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 2rem;
+        padding: 2rem;
+    }
+
+    .barcode-card {
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .barcode-card h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: var(--gray-800);
+    }
+
+    .barcode-card p {
+        color: var(--gray-600);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .print-btn {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 100;
+        box-shadow: var(--shadow-lg);
+    }
+
+    @media print {
+
+        .sidebar,
+        .header,
+        .print-btn {
+            display: none !important;
+        }
+
+        .main-content {
+            margin: 0;
+            padding: 0;
+        }
+
+        .barcode-grid {
+            display: block;
+        }
+
+        .barcode-card {
+            page-break-inside: avoid;
+            display: inline-block;
+            width: 45%;
+            margin: 10px;
+            border: 1px solid #ccc;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-section">
+    <div class="section-header">
+        <h2><i class="fas fa-barcode"></i> Catálogo de Productos</h2>
+        <p class="text-gray-500">Imprime esta página para tener etiquetas físicas de tus productos.</p>
+    </div>
+
+    <div class="barcode-grid">
+        {% for p in products %}
+        <div class="barcode-card">
+            <h3>{{ p.name }}</h3>
+            <p>{{ p.category }} - ${{ '%.2f'|format(p.price) }}</p>
+            <svg class="barcode" jsbarcode-format="CODE128" jsbarcode-value="{{ p.sku }}" jsbarcode-textmargin="0"
+                jsbarcode-fontoptions="bold">
+            </svg>
+        </div>
+        {% else %}
+        <p>No hay productos en el inventario.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<button onclick="window.print()" class="btn btn-primary print-btn">
+    <i class="fas fa-print"></i> Imprimir Catálogo
+</button>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        JsBarcode(".barcode").init();
+    });
+</script>
+{% endblock %}

@@ -1,8 +1,8 @@
-
 {% extends "base.html" %}
 {% block header_title %}Inventario{% endblock %}
 {% block content %}
 <div x-data="inventoryPage()">
+  <!-- Tu contenido HTML permanece igual -->
   <div class="content-section">
     <div class="section-header">
       <h2>Inventario</h2>
@@ -12,12 +12,24 @@
       <input class="form-control" style="max-width:420px" placeholder="Buscar por nombre, SKU o categoría" x-model="q">
       <select class="form-control" style="max-width:220px" x-model="cat">
         <option value="">Todas las categorías</option>
-        <template x-for="c in cats" :key="c"><option x-text="c"></option></template>
+        <template x-for="c in cats" :key="c">
+          <option x-text="c"></option>
+        </template>
       </select>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Nombre</th><th>SKU</th><th>Categoría</th><th>Stock</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>SKU</th>
+            <th>Categoría</th>
+            <th>Stock</th>
+            <th>Precio</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
           <template x-for="p in filtered()" :key="p.id">
             <tr>
@@ -27,11 +39,13 @@
               <td x-text="p.stock"></td>
               <td>$ <span x-text="p.price.toFixed(2)"></span></td>
               <td>
-                <span class="status" :class="p.stock>10?'status-instock':(p.stock>0?'status-lowstock':'status-outstock')" x-text="p.stock>10?'En Stock':(p.stock>0?'Stock Bajo':'Sin Stock')"></span>
+                <span class="status"
+                  :class="p.stock>10?'status-instock':(p.stock>0?'status-lowstock':'status-outstock')"
+                  x-text="p.stock>10?'En Stock':(p.stock>0?'Stock Bajo':'Sin Stock')"></span>
               </td>
               <td class="actions">
-                 <button class="btn" @click="edit(p)"><i class="fas fa-edit" style="color:#4CAF50"></i></button>
-                 <button class="btn" @click="del(p)"><i class="fas fa-trash" style="color:#e64c4c"></i></button>
+                <button class="btn" @click="edit(p)"><i class="fas fa-edit" style="color:#4CAF50"></i></button>
+                <button class="btn" @click="del(p)"><i class="fas fa-trash" style="color:#e64c4c"></i></button>
               </td>
             </tr>
           </template>
@@ -41,24 +55,22 @@
   </div>
 
   <!-- Modal de Producto -->
-  <div x-show="show" 
-       style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);"
-       x-transition:enter="transition ease-out duration-300"
-       x-transition:enter-start="opacity-0 transform scale-95"
-       x-transition:enter-end="opacity-100 transform scale-100"
-       x-transition:leave="transition ease-in duration-200"
-       x-transition:leave-start="opacity-100 transform scale-100"
-       x-transition:leave-end="opacity-0 transform scale-95">
-    <div class="content-section" 
-         style="max-width:680px;width:100%;background:white;border-radius:1rem;box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);" 
-         @click.outside="show=false">
+  <div x-show="show"
+    style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
+    x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95">
+    <div class="content-section"
+      style="max-width:680px;width:100%;background:white;border-radius:1rem;box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);"
+      @click.outside="show=false">
       <div style="padding:1.5rem;border-bottom:1px solid var(--gray-200)">
         <h3 style="font-size:1.25rem;font-weight:600;color:var(--gray-800);">
-          <i class="fas" :class="form.id ? 'fa-edit' : 'fa-plus-circle'" style="color:var(--primary);margin-right:0.5rem"></i>
+          <i class="fas" :class="form.id ? 'fa-edit' : 'fa-plus-circle'"
+            style="color:var(--primary);margin-right:0.5rem"></i>
           <span x-text="form.id ? 'Editar producto' : 'Nuevo producto'"></span>
         </h3>
       </div>
-      
+
       <div style="padding:1.5rem;">
         <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-group">
@@ -67,7 +79,15 @@
           </div>
           <div class="form-group">
             <label><i class="fas fa-barcode"></i> SKU</label>
-            <input class="form-control" x-model="form.sku" placeholder="Código único">
+            <div style="display: flex; gap: 0.5rem;">
+              <input class="form-control" x-model="form.sku" placeholder="Código único">
+              <button class="btn btn-secondary" @click="generateSku()" title="Generar código aleatorio">
+                <i class="fas fa-magic"></i>
+              </button>
+            </div>
+            <div style="margin-top: 0.5rem; text-align: center;" x-show="form.sku">
+              <svg id="barcode-preview"></svg>
+            </div>
           </div>
           <div class="form-group">
             <label><i class="fas fa-cubes"></i> Stock</label>
@@ -75,7 +95,8 @@
           </div>
           <div class="form-group">
             <label><i class="fas fa-tag"></i> Precio</label>
-            <input class="form-control" type="number" step="0.01" min="0" x-model.number="form.price" placeholder="0.00">
+            <input class="form-control" type="number" step="0.01" min="0" x-model.number="form.price"
+              placeholder="0.00">
           </div>
           <div class="form-group">
             <label><i class="fas fa-calendar"></i> Vencimiento</label>
@@ -88,7 +109,8 @@
         </div>
       </div>
 
-      <div style="padding:1rem;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 1rem 1rem;display:flex;justify-content:flex-end;gap:0.75rem;">
+      <div
+        style="padding:1rem;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 1rem 1rem;display:flex;justify-content:flex-end;gap:0.75rem;">
         <button class="btn btn-secondary" @click="show=false">
           <i class="fas fa-times"></i> Cancelar
         </button>
@@ -100,38 +122,118 @@
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-function inventoryPage(){
-  return {
-    q:"", cat:"", show:false,
-    form:{id:null,name:"",sku:"",stock:0,price:0,expiry:"",category:""},
-    products: {{ products|tojson }},
-    get cats(){ return [...new Set(this.products.map(p=>p.category).filter(Boolean))] },
-    filtered(){
-      const q=this.q.toLowerCase();
-      return this.products.filter(p =>
-        (!this.cat || p.category===this.cat) &&
-        (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q))
-      );
-    },
-    openNew(){ this.form={id:null,name:"",sku:"",stock:0,price:0,expiry:"",category:""}; this.show=true; },
-    edit(p){ this.form=JSON.parse(JSON.stringify(p)); this.show=true; },
-    async save(){
-      if(this.form.id){
-        const res = await fetch(`/api/inventory/${this.form.id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(this.form)});
-        if(res.ok){ const {item}=await res.json(); const i=this.products.findIndex(x=>x.id===item.id); this.products.splice(i,1,item); this.show=false; }
-      } else {
-        const res = await fetch('/api/inventory', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(this.form)});
-        if(res.ok){ const {item}=await res.json(); this.products.unshift(item); this.show=false; }
+  function inventoryPage() {
+    return {
+      products: [],
+      cats: [],
+      q: '',
+      cat: '',
+      show: false,
+      form: {},
+
+      init() {
+        this.loadProducts();
+      },
+
+      async loadProducts() {
+        const res = await fetch('/api/inventory');
+        if (res.ok) {
+          this.products = await res.json();
+          this.cats = [...new Set(this.products.map(p => p.category).filter(Boolean))];
+        }
+      },
+
+      filtered() {
+        let filtered = this.products;
+
+        if (this.q) {
+          const query = this.q.toLowerCase();
+          filtered = filtered.filter(p =>
+            p.name.toLowerCase().includes(query) ||
+            p.sku.toLowerCase().includes(query) ||
+            p.category.toLowerCase().includes(query)
+          );
+        }
+
+        if (this.cat) {
+          filtered = filtered.filter(p => p.category === this.cat);
+        }
+
+        return filtered;
+      },
+
+      openNew() {
+        this.form = { id: null, name: "", sku: "", stock: 0, price: 0, expiry: "", category: "" };
+        this.show = true;
+        setTimeout(() => {
+          const preview = document.getElementById('barcode-preview');
+          if (preview) preview.innerHTML = '';
+        }, 100);
+      },
+
+      edit(p) {
+        this.form = JSON.parse(JSON.stringify(p));
+        this.show = true;
+        this.$nextTick(() => this.renderBarcode());
+      },
+
+      generateSku() {
+        this.form.sku = Math.floor(10000000 + Math.random() * 90000000).toString();
+        this.renderBarcode();
+      },
+
+      renderBarcode() {
+        if (this.form.sku && typeof JsBarcode !== 'undefined') {
+          try {
+            JsBarcode("#barcode-preview", this.form.sku, {
+              format: "CODE128",
+              height: 40,
+              displayValue: true
+            });
+          } catch (e) {
+            console.error("Invalid barcode", e);
+          }
+        }
+      },
+
+      async save() {
+        if (this.form.id) {
+          const res = await fetch(`/api/inventory/${this.form.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.form)
+          });
+          if (res.ok) {
+            const { item } = await res.json();
+            const i = this.products.findIndex(x => x.id === item.id);
+            this.products.splice(i, 1, item);
+            this.show = false;
+          }
+        } else {
+          const res = await fetch('/api/inventory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.form)
+          });
+          if (res.ok) {
+            const { item } = await res.json();
+            this.products.unshift(item);
+            this.show = false;
+          }
+        }
+      },
+
+      async del(p) {
+        if (!confirm('¿Eliminar producto?')) return;
+        const res = await fetch(`/api/inventory/${p.id}`, { method: 'DELETE' });
+        if (res.ok) {
+          this.products = this.products.filter(x => x.id !== p.id);
+        }
       }
-    },
-    async del(p){
-      if(!confirm('¿Eliminar producto?')) return;
-      const res = await fetch(`/api/inventory/${p.id}`, {method:'DELETE'});
-      if(res.ok){ this.products = this.products.filter(x=>x.id!==p.id); }
     }
   }
-}
 </script>
 {% endblock %}
