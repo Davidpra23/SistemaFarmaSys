@@ -6,105 +6,9 @@
 <div x-data="salesPOS()" x-init="init()" class="container-fluid p-4">
 
   <div class="row">
-    <!-- MITAD IZQUIERDA (50%): Escáner y Productos -->
-    <div class="col-md-6">
 
-      <!-- 1. ESCÁNER (Cajita pequeña) -->
-      <div class="card bg-dark text-white shadow-sm mb-3 overflow-hidden" style="max-width: 240px;">
-        <div
-          class="card-body p-2 text-center position-relative d-flex justify-content-center align-items-center bg-black"
-          style="min-height: 220px;">
-
-          <!-- Contenedor del lector -->
-          <div class="scanner-container">
-            <div id="reader"></div>
-          </div>
-
-          <!-- Botón para activar cámara manualmente -->
-          <div x-show="!scannerActive" class="position-absolute top-50 start-50 translate-middle w-100"
-            style="z-index: 20;">
-            <button class="btn btn-primary btn-sm shadow" @click="startScanner()">
-              <i class="fas fa-camera"></i> Activar
-            </button>
-          </div>
-
-          <!-- Mensaje de confirmación -->
-          <div id="scan-message"
-            style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: none; z-index: 10;">
-            <span class="badge bg-success p-1 fs-6 shadow">OK</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. LISTA DE PRODUCTOS (Debajo del escáner) -->
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3">
-          <!-- Buscador -->
-          <div class="input-group">
-            <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
-            <input type="text" class="form-control border-start-0 bg-light" placeholder="Buscar por nombre o código..."
-              x-model="searchQuery" @keydown.enter="manualAdd()">
-            <button class="btn btn-outline-secondary" @click="searchQuery = ''" x-show="searchQuery">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="card-body p-0" style="height: 450px; overflow-y: auto;">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="table-light sticky-top">
-              <tr>
-                <th class="ps-4">Producto</th>
-                <th>Código</th>
-                <th>Precio</th>
-                <th>Stock</th>
-                <th class="text-end pe-4">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr x-show="loading">
-                <td colspan="5" class="text-center py-5">
-                  <div class="spinner-border text-primary" role="status"></div>
-                  <p class="text-muted mt-2">Cargando inventario...</p>
-                </td>
-              </tr>
-
-              <template x-for="p in filteredProducts()" :key="p.id">
-                <tr :class="{'table-danger': p.stock <= 0, 'bg-light': p.stock <= 0}">
-                  <td class="ps-4">
-                    <div class="fw-bold text-truncate" style="max-width: 200px;" x-text="p.name"></div>
-                    <small class="text-muted" x-text="p.category"></small>
-                  </td>
-                  <td><span class="badge bg-light text-dark border font-monospace" x-text="p.sku"></span></td>
-                  <td class="fw-bold text-primary">$<span x-text="p.price.toFixed(2)"></span></td>
-                  <td>
-                    <span class="badge rounded-pill"
-                      :class="p.stock > 10 ? 'bg-success' : (p.stock > 0 ? 'bg-warning text-dark' : 'bg-danger')"
-                      x-text="p.stock > 0 ? p.stock : 'Agotado'"></span>
-                  </td>
-                  <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" @click="addToCart(p)"
-                      :disabled="p.stock <= 0" style="width: 32px; height: 32px; padding: 0;">
-                      <i class="fas fa-plus"></i>
-                    </button>
-                  </td>
-                </tr>
-              </template>
-
-              <tr x-show="!loading && filteredProducts().length === 0">
-                <td colspan="5" class="text-center py-5 text-muted">
-                  <i class="fas fa-box-open fa-3x mb-3 text-secondary opacity-25"></i>
-                  <p>No se encontraron productos</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- MITAD DERECHA (50%): Carrito -->
-    <div class="col-md-6">
+    <!-- MITAD DERECHA (Carrito arriba) -->
+    <div class="col-md-6 order-1 mb-4">
       <div class="card shadow h-100 border-0">
         <div class="card-header bg-primary text-white py-3">
           <div class="d-flex justify-content-between align-items-center">
@@ -117,6 +21,7 @@
 
         <!-- Lista de Items del Carrito -->
         <div class="card-body p-0 bg-light d-flex flex-column" style="height: calc(100vh - 280px); overflow-y: auto;">
+          
           <!-- Estado Vacío -->
           <div x-show="cart.length === 0" class="text-center text-muted p-5 my-auto">
             <div class="mb-3">
@@ -134,28 +39,31 @@
                   <span class="fw-bold text-dark" x-text="item.name"></span>
                   <span class="fw-bold text-primary">$<span x-text="(item.price * item.qty).toFixed(2)"></span></span>
                 </div>
+
                 <div class="d-flex justify-content-between align-items-center mt-2">
                   <div class="input-group input-group-sm shadow-sm" style="width: 100px;">
                     <button class="btn btn-outline-secondary" @click="updateQty(index, -1)">-</button>
                     <input type="text" class="form-control text-center bg-white fw-bold" readonly x-model="item.qty">
                     <button class="btn btn-outline-secondary" @click="updateQty(index, 1)">+</button>
                   </div>
-                  <button class="btn btn-sm text-danger hover-bg-light rounded p-1" @click="cart.splice(index, 1)"
-                    title="Eliminar">
+
+                  <button class="btn btn-sm text-danger hover-bg-light rounded p-1" @click="cart.splice(index, 1)">
                     <i class="fas fa-trash-alt"></i>
                   </button>
                 </div>
               </li>
             </template>
           </ul>
+
         </div>
 
-        <!-- Footer del Carrito (Totales y Botón) -->
+        <!-- Footer: Totales -->
         <div class="card-footer bg-white border-top p-4 shadow-lg" style="z-index: 5;">
           <div class="d-flex justify-content-between mb-2 text-muted small">
             <span>Artículos:</span>
             <span class="fw-bold" x-text="cart.reduce((a, b) => a + b.qty, 0)"></span>
           </div>
+
           <div class="d-flex justify-content-between mb-4 align-items-end">
             <span class="h4 mb-0 text-dark">Total:</span>
             <span class="display-6 mb-0 text-primary fw-bold">$<span x-text="totalCart()"></span></span>
@@ -170,10 +78,113 @@
         </div>
       </div>
     </div>
+
+    <!-- MITAD IZQUIERDA (Escáner + Productos abajo) -->
+    <div class="col-md-6 order-2">
+
+      <!-- ESCÁNER -->
+      <div class="card bg-dark text-white shadow-sm mb-3 overflow-hidden" style="max-width: 240px;">
+        <div
+          class="card-body p-2 text-center position-relative d-flex justify-content-center align-items-center bg-black"
+          style="min-height: 220px;">
+
+          <div class="scanner-container">
+            <div id="reader"></div>
+          </div>
+
+          <!-- Botón cámara -->
+          <div x-show="!scannerActive" class="position-absolute top-50 start-50 translate-middle w-100"
+            style="z-index: 20;">
+            <button class="btn btn-primary btn-sm shadow" @click="startScanner()">
+              <i class="fas fa-camera"></i> Activar
+            </button>
+          </div>
+
+          <!-- Feedback -->
+          <div id="scan-message"
+            style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: none; z-index: 10;">
+            <span class="badge bg-success p-1 fs-6 shadow">OK</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LISTA DE PRODUCTOS -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3">
+          <div class="input-group">
+            <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+            <input type="text" class="form-control border-start-0 bg-light"
+              placeholder="Buscar por nombre o código..." x-model="searchQuery" @keydown.enter="manualAdd()">
+            <button class="btn btn-outline-secondary" @click="searchQuery = ''" x-show="searchQuery">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body p-0" style="height: 450px; overflow-y: auto;">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th class="ps-4">Producto</th>
+                <th>Código</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th class="text-end pe-4">Acción</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              <tr x-show="loading">
+                <td colspan="5" class="text-center py-5">
+                  <div class="spinner-border text-primary" role="status"></div>
+                  <p class="text-muted mt-2">Cargando inventario...</p>
+                </td>
+              </tr>
+
+              <template x-for="p in filteredProducts()" :key="p.id">
+                <tr :class="{'table-danger': p.stock <= 0, 'bg-light': p.stock <= 0}">
+                  <td class="ps-4">
+                    <div class="fw-bold text-truncate" style="max-width: 200px;" x-text="p.name"></div>
+                    <small class="text-muted" x-text="p.category"></small>
+                  </td>
+
+                  <td><span class="badge bg-light text-dark border font-monospace" x-text="p.sku"></span></td>
+
+                  <td class="fw-bold text-primary">$<span x-text="p.price.toFixed(2)"></span></td>
+
+                  <td>
+                    <span class="badge rounded-pill"
+                      :class="p.stock > 10 ? 'bg-success' : (p.stock > 0 ? 'bg-warning text-dark' : 'bg-danger')"
+                      x-text="p.stock > 0 ? p.stock : 'Agotado'"></span>
+                  </td>
+
+                  <td class="text-end pe-4">
+                    <button class="btn btn-sm btn-outline-primary rounded-circle shadow-sm"
+                      @click="addToCart(p)" :disabled="p.stock <= 0" style="width: 32px; height: 32px; padding: 0;">
+                      <i class="fas fa-plus"></i>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+
+              <tr x-show="!loading && filteredProducts().length === 0">
+                <td colspan="5" class="text-center py-5 text-muted">
+                  <i class="fas fa-box-open fa-3x mb-3 text-secondary opacity-25"></i>
+                  <p>No se encontraron productos</p>
+                </td>
+              </tr>
+
+            </tbody>
+
+          </table>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
-<!-- Estilos para mantener la cámara compacta y cuadrada -->
 <style>
   .scanner-container {
     width: 200px;
@@ -199,10 +210,6 @@
     height: 100% !important;
     object-fit: cover !important;
     border-radius: 12px;
-  }
-
-  .text-shadow {
-    text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.8);
   }
 </style>
 {% endblock %}
