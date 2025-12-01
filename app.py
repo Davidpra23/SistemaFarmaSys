@@ -1,8 +1,9 @@
-
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort
 from functools import wraps
 from datetime import datetime, timedelta
 import uuid
+import random
+import string
 
 app = Flask(__name__)
 app.secret_key = "dev-secret-change-me"
@@ -18,6 +19,70 @@ INVENTORY = [
 
 RECEIPTS = []  # each receipt: {id, datetime, items: [{name, qty, price, subtotal}], total}
 
+# ------------------ Usuarios Demo ------------------
+USERS = [
+    {
+        "id": "1",
+        "full_name": "Administrador Principal",
+        "username": "admin",
+        "email": "admin@farmacia.com",
+        "role": "admin",
+        "status": "active",
+        "password": "123",
+        "last_login": datetime.now().isoformat(),
+        "can_manage_users": True,
+        "can_manage_inventory": True,
+        "can_view_reports": True,
+        "can_export_data": True,
+        "created_at": datetime.now().isoformat()
+    },
+    {
+        "id": "2",
+        "full_name": "María González",
+        "username": "maria.gonzalez",
+        "email": "maria@farmacia.com",
+        "role": "farmacia",
+        "status": "active",
+        "password": "123",
+        "last_login": (datetime.now() - timedelta(days=1)).isoformat(),
+        "can_manage_users": False,
+        "can_manage_inventory": True,
+        "can_view_reports": True,
+        "can_export_data": False,
+        "created_at": datetime.now().isoformat()
+    },
+    {
+        "id": "3",
+        "full_name": "Carlos Rodríguez",
+        "username": "carlos.rodriguez",
+        "email": "carlos@farmacia.com",
+        "role": "ventas",
+        "status": "active",
+        "password": "123",
+        "last_login": (datetime.now() - timedelta(days=2)).isoformat(),
+        "can_manage_users": False,
+        "can_manage_inventory": False,
+        "can_view_reports": True,
+        "can_export_data": True,
+        "created_at": datetime.now().isoformat()
+    },
+    {
+        "id": "4",
+        "full_name": "Laura Martínez",
+        "username": "laura.martinez",
+        "email": "laura@farmacia.com",
+        "role": "inventario",
+        "status": "inactive",
+        "password": "123",
+        "last_login": (datetime.now() - timedelta(days=5)).isoformat(),
+        "can_manage_users": False,
+        "can_manage_inventory": True,
+        "can_view_reports": False,
+        "can_export_data": False,
+        "created_at": datetime.now().isoformat()
+    }
+]
+
 # ------------------ Auth ------------------
 def login_required(f):
     @wraps(f)
@@ -27,14 +92,36 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = session.get("user", {})
+        if not user:
+            return redirect(url_for("login", next=request.path))
+        if user.get("role") != "admin":
+            abort(403)  # Forbidden
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        if username == "admin" and password == "123":
-            session["user"] = {"username": "admin"}
+        
+        # Verificar en la lista de usuarios
+        user = next((u for u in USERS if u["username"] == username and u["status"] == "active"), None)
+        
+        if user and user.get("password") == password:
+            session["user"] = {
+                "username": user["username"],
+                "full_name": user["full_name"],
+                "email": user["email"],
+                "role": user["role"]
+            }
+            # Actualizar última conexión
+            user["last_login"] = datetime.now().isoformat()
             return redirect(url_for("dashboard"))
         else:
             error = "Credenciales inválidas. Usa admin / 123 para probar."
@@ -105,6 +192,189 @@ def settings():
 @login_required
 def barcodes():
     return render_template("barcodes.html", products=INVENTORY)
+
+# ------------------ Gestión de Usuarios ------------------
+@app.route("/users")
+@login_required
+@admin_required
+def users():
+    return render_template("users.html")
+
+# ------------------ API para Gestión de Usuarios ------------------
+@app.get("/api/users")
+@login_required
+@admin_required
+def api_get_users():
+    # No enviar las contraseñas en la respuesta
+    safe_users = []
+    for user in USERS:
+        safe_user = user.copy()
+        safe_user.pop('password', None)
+        safe_users.append(safe_user)
+    return jsonify(safe_users)
+
+@app.post("/api/users")
+@login_required
+@admin_required
+def api_add_user():
+    data = request.json or {}
+    
+    # Validaciones
+    full_name = data.get("full_name", "").strip()
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip()
+    role = data.get("role", "").strip()
+    password = data.get("password", "").strip()
+    status = data.get("status", "active")
+    
+    # Validar campos requeridos
+    if not full_name or len(full_name) < 3:
+        return jsonify({"ok": False, "error": "El nombre completo debe tener al menos 3 caracteres"}), 400
+    
+    if not username or len(username) < 3:
+        return jsonify({"ok": False, "error": "El nombre de usuario debe tener al menos 3 caracteres"}), 400
+    
+    if not email or "@" not in email:
+        return jsonify({"ok": False, "error": "Email inválido"}), 400
+    
+    if not role:
+        return jsonify({"ok": False, "error": "Debe seleccionar un rol"}), 400
+    
+    if not password or len(password) < 6:
+        return jsonify({"ok": False, "error": "La contraseña debe tener al menos 6 caracteres"}), 400
+    
+    # Validar unicidad
+    if any(u["username"] == username for u in USERS):
+        return jsonify({"ok": False, "error": "El nombre de usuario ya existe"}), 400
+    
+    if any(u["email"] == email for u in USERS):
+        return jsonify({"ok": False, "error": "El email ya está registrado"}), 400
+    
+    # Crear nuevo usuario
+    new_user = {
+        "id": str(uuid.uuid4()),
+        "full_name": full_name,
+        "username": username,
+        "email": email,
+        "role": role,
+        "status": status,
+        "password": password,
+        "last_login": None,
+        "can_manage_users": bool(data.get("can_manage_users", False)),
+        "can_manage_inventory": bool(data.get("can_manage_inventory", False)),
+        "can_view_reports": bool(data.get("can_view_reports", False)),
+        "can_export_data": bool(data.get("can_export_data", False)),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    USERS.append(new_user)
+    
+    # Devolver usuario sin contraseña
+    safe_user = new_user.copy()
+    safe_user.pop('password', None)
+    
+    return jsonify({"ok": True, "user": safe_user})
+
+@app.put("/api/users/<user_id>")
+@login_required
+@admin_required
+def api_update_user(user_id):
+    data = request.json or {}
+    
+    for user in USERS:
+        if user["id"] == user_id:
+            # Validar que el nuevo username no exista
+            new_username = data.get("username", user["username"]).strip()
+            if new_username != user["username"] and any(u["username"] == new_username for u in USERS if u["id"] != user_id):
+                return jsonify({"ok": False, "error": "El nombre de usuario ya existe"}), 400
+            
+            # Validar que el nuevo email no exista
+            new_email = data.get("email", user["email"]).strip()
+            if new_email != user["email"] and any(u["email"] == new_email for u in USERS if u["id"] != user_id):
+                return jsonify({"ok": False, "error": "El email ya está registrado"}), 400
+            
+            # Si se proporciona nueva contraseña, actualizarla
+            new_password = data.get("password", "").strip()
+            if new_password:
+                if len(new_password) < 6:
+                    return jsonify({"ok": False, "error": "La contraseña debe tener al menos 6 caracteres"}), 400
+                user["password"] = new_password
+            
+            # Actualizar otros campos
+            user.update({
+                "full_name": data.get("full_name", user["full_name"]).strip(),
+                "username": new_username,
+                "email": new_email,
+                "role": data.get("role", user["role"]).strip(),
+                "status": data.get("status", user["status"]),
+                "can_manage_users": bool(data.get("can_manage_users", user["can_manage_users"])),
+                "can_manage_inventory": bool(data.get("can_manage_inventory", user["can_manage_inventory"])),
+                "can_view_reports": bool(data.get("can_view_reports", user["can_view_reports"])),
+                "can_export_data": bool(data.get("can_export_data", user["can_export_data"]))
+            })
+            
+            # Devolver usuario sin contraseña
+            safe_user = user.copy()
+            safe_user.pop('password', None)
+            
+            return jsonify({"ok": True, "user": safe_user})
+    
+    abort(404)
+
+@app.delete("/api/users/<user_id>")
+@login_required
+@admin_required
+def api_delete_user(user_id):
+    global USERS
+    # No permitir eliminar al usuario admin principal
+    if user_id == "1":
+        return jsonify({"ok": False, "error": "No se puede eliminar el administrador principal"}), 400
+    
+    before = len(USERS)
+    USERS = [u for u in USERS if u["id"] != user_id]
+    return jsonify({"ok": True, "deleted": before - len(USERS)})
+
+@app.put("/api/users/<user_id>/toggle-status")
+@login_required
+@admin_required
+def api_toggle_user_status(user_id):
+    for user in USERS:
+        if user["id"] == user_id:
+            # No permitir desactivar al administrador principal
+            if user_id == "1":
+                return jsonify({"ok": False, "error": "No se puede desactivar el administrador principal"}), 400
+            
+            user["status"] = "active" if user["status"] == "inactive" else "inactive"
+            
+            # Devolver usuario sin contraseña
+            safe_user = user.copy()
+            safe_user.pop('password', None)
+            
+            return jsonify({"ok": True, "user": safe_user})
+    
+    abort(404)
+
+@app.post("/api/users/<user_id>/reset-password")
+@login_required
+@admin_required
+def api_reset_password(user_id):
+    user = next((u for u in USERS if u["id"] == user_id), None)
+    if not user:
+        abort(404)
+    
+    # Generar nueva contraseña aleatoria
+    new_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    
+    # Actualizar contraseña
+    user["password"] = new_password
+    
+    email = request.json.get("email", user["email"]) if request.json else user["email"]
+    
+    return jsonify({
+        "ok": True, 
+        "message": f"Se ha generado una nueva contraseña. En producción se enviaría al email: {email}",
+        "debug_password": new_password  # Solo para debug
+    })
 
 # ------------------ API-ish endpoints for demo CRUD ------------------
 @app.get("/api/inventory")
@@ -183,11 +453,13 @@ def view_receipt(rid):
     abort(404)
 
 # ------------------ Error handlers ------------------
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template("403.html"), 403
+
 @app.errorhandler(404)
 def not_found(e):
     return render_template("404.html"), 404
 
 if __name__ == "__main__":
-    # Run without the auto-reloader so the process stays in the same PID
-    # (helps when starting the server programmatically during tests).
     app.run(host='127.0.0.1', port=5000, debug=True, use_reloader=False)

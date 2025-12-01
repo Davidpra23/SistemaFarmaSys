@@ -1,0 +1,786 @@
+{% extends "base.html" %}
+{% block header_title %}Gestión de Usuarios{% endblock %}
+{% block content %}
+<div x-data="usersPage()">
+  <!-- Notificación de éxito -->
+  <div x-show="showNotification" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0 transform translate-y-2"
+    x-transition:enter-end="opacity-100 transform translate-y-0"
+    x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 transform translate-y-0"
+    x-transition:leave-end="opacity-0 transform translate-y-2"
+    style="position:fixed;top:20px;right:20px;z-index:9999;max-width:360px;">
+    <div class="notification" :class="notificationType === 'success' ? 'notification-success' : 'notification-error'"
+      style="padding:1rem;border-radius:0.5rem;box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <i class="fas" :class="notificationType === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
+          style="font-size:1.25rem;"></i>
+        <div>
+          <p style="font-weight:600;margin:0;" x-text="notificationTitle"></p>
+          <p style="margin:0;font-size:0.875rem;" x-text="notificationMessage"></p>
+        </div>
+        <button @click="showNotification = false" style="margin-left:auto;background:none;border:none;cursor:pointer;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido principal -->
+  <div style="background:white;border-radius:1rem;padding:1.5rem;box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);margin-bottom:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+      <h2 style="font-size:1.5rem;font-weight:600;color:var(--gray-800);display:flex;align-items:center;gap:0.5rem;">
+        <i class="fas fa-users-cog"></i> Gestión de Usuarios
+      </h2>
+      <button class="btn btn-primary" @click="openNewUser()" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <i class="fas fa-user-plus"></i> Nuevo Usuario
+      </button>
+    </div>
+    
+    <!-- Filtros y búsqueda -->
+    <div style="display:flex;gap:1rem;align-items:center;margin-bottom:14px;">
+      <input class="form-control" style="max-width:300px" placeholder="Buscar por nombre o usuario" x-model="searchQuery">
+      <select class="form-control" style="max-width:220px" x-model="roleFilter">
+        <option value="">Todos los roles</option>
+        <option value="admin">Administrador</option>
+        <option value="farmacia">Farmacia</option>
+        <option value="ventas">Ventas</option>
+        <option value="inventario">Inventario</option>
+      </select>
+      <select class="form-control" style="max-width:220px" x-model="statusFilter">
+        <option value="">Todos los estados</option>
+        <option value="active">Activos</option>
+        <option value="inactive">Inactivos</option>
+      </select>
+    </div>
+
+    <!-- Tabla de usuarios -->
+    <div style="overflow-x:auto;border-radius:0.75rem;border:1px solid var(--gray-200);background:white;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Nombre Completo</th>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Usuario</th>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Rol</th>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Email</th>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Estado</th>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Última Conexión</th>
+            <th style="padding:1rem;text-align:left;font-weight:600;color:var(--gray-700);background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:0.875rem;text-transform:uppercase;letter-spacing:0.05em;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="user in filteredUsers" :key="user.id">
+            <tr>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);" x-text="user.full_name"></td>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <i class="fas fa-user" style="color:var(--gray-500)"></i>
+                  <span x-text="user.username"></span>
+                </div>
+              </td>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);">
+                <span class="role-tag" :class="getRoleClass(user.role)" x-text="getRoleLabel(user.role)" style="display:inline-block;padding:0.25rem 0.75rem;border-radius:9999px;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.025em;"></span>
+              </td>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);" x-text="user.email"></td>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);">
+                <span class="status" :class="user.status === 'active' ? 'status-instock' : 'status-outstock'"
+                      x-text="user.status === 'active' ? 'Activo' : 'Inactivo'" style="padding:0.25rem 0.75rem;border-radius:2rem;font-size:0.75rem;font-weight:500;"></span>
+              </td>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);" x-text="user.last_login ? formatDate(user.last_login) : 'Nunca'"></td>
+              <td style="padding:1rem;border-bottom:1px solid var(--gray-200);color:var(--gray-800);">
+                <div style="display:flex;gap:0.375rem;justify-content:center;">
+                  <button class="btn" @click="editUser(user)" title="Editar usuario" style="padding:0.375rem;background:none;border:1px solid var(--gray-200);border-radius:0.375rem;cursor:pointer;transition:all 0.2s;">
+                    <i class="fas fa-edit" style="color:#4CAF50"></i>
+                  </button>
+                  <button class="btn" @click="toggleUserStatus(user)" 
+                          :title="user.status === 'active' ? 'Desactivar usuario' : 'Activar usuario'" style="padding:0.375rem;background:none;border:1px solid var(--gray-200);border-radius:0.375rem;cursor:pointer;transition:all 0.2s;">
+                    <i class="fas" :class="user.status === 'active' ? 'fa-user-slash' : 'fa-user-check'" 
+                       :style="user.status === 'active' ? 'color:#ff9800' : 'color:#2196F3'"></i>
+                  </button>
+                  <button class="btn" @click="resetPassword(user)" title="Restablecer contraseña" style="padding:0.375rem;background:none;border:1px solid var(--gray-200);border-radius:0.375rem;cursor:pointer;transition:all 0.2s;">
+                    <i class="fas fa-key" style="color:#9C27B0"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mensaje cuando no hay usuarios -->
+    <div x-show="filteredUsers.length === 0" style="text-align:center;padding:3rem;color:var(--gray-500);">
+      <i class="fas fa-users" style="font-size:3rem;margin-bottom:1rem;"></i>
+      <h3>No hay usuarios registrados</h3>
+      <p>Comience agregando un nuevo usuario usando el botón "Nuevo Usuario"</p>
+    </div>
+  </div>
+
+  <!-- Modal para Nuevo/Editar Usuario -->
+  <div x-show="showUserModal"
+    style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);z-index:1000;"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
+    x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95">
+    <div style="max-width:680px;width:100%;background:white;border-radius:1rem;box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.25);"
+      @click.outside="showUserModal=false">
+      <div style="padding:1.5rem;border-bottom:1px solid var(--gray-200)">
+        <h3 style="font-size:1.25rem;font-weight:600;color:var(--gray-800);">
+          <i class="fas" :class="editingUser ? 'fa-user-edit' : 'fa-user-plus'"
+            style="color:var(--primary);margin-right:0.5rem"></i>
+          <span x-text="editingUser ? 'Editar Usuario' : 'Nuevo Usuario'"></span>
+        </h3>
+      </div>
+
+      <div style="padding:1.5rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <!-- Columna Izquierda -->
+          <div>
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-id-card"></i> Nombre Completo <span style="color:#dc2626;">*</span>
+              </label>
+              <input class="form-control" :class="errors.full_name ? 'error' : ''" x-model="userForm.full_name" 
+                     placeholder="Ej: Juan Pérez Gómez" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+              <span x-show="errors.full_name" style="color:#dc2626;font-size:0.875rem;display:block;margin-top:0.25rem;">
+                <i class="fas fa-exclamation-circle"></i> <span x-text="errors.full_name"></span>
+              </span>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-user"></i> Nombre de Usuario <span style="color:#dc2626;">*</span>
+              </label>
+              <input class="form-control" :class="errors.username ? 'error' : ''" x-model="userForm.username" 
+                     placeholder="Ej: juan.perez" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+              <span x-show="errors.username" style="color:#dc2626;font-size:0.875rem;display:block;margin-top:0.25rem;">
+                <i class="fas fa-exclamation-circle"></i> <span x-text="errors.username"></span>
+              </span>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-envelope"></i> Email <span style="color:#dc2626;">*</span>
+              </label>
+              <input class="form-control" :class="errors.email ? 'error' : ''" type="email" x-model="userForm.email" 
+                     placeholder="usuario@ejemplo.com" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+              <span x-show="errors.email" style="color:#dc2626;font-size:0.875rem;display:block;margin-top:0.25rem;">
+                <i class="fas fa-exclamation-circle"></i> <span x-text="errors.email"></span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Columna Derecha -->
+          <div>
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-user-tag"></i> Rol <span style="color:#dc2626;">*</span>
+              </label>
+              <select class="form-control" :class="errors.role ? 'error' : ''" x-model="userForm.role" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+                <option value="">Seleccionar rol</option>
+                <option value="admin">Administrador</option>
+                <option value="farmacia">Farmacia</option>
+                <option value="ventas">Ventas</option>
+                <option value="inventario">Inventario</option>
+              </select>
+              <span x-show="errors.role" style="color:#dc2626;font-size:0.875rem;display:block;margin-top:0.25rem;">
+                <i class="fas fa-exclamation-circle"></i> <span x-text="errors.role"></span>
+              </span>
+            </div>
+
+            <!-- CAMPO DE CONTRASEÑA - SIEMPRE VISIBLE -->
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-key"></i> Contraseña 
+                <span style="color:#dc2626;" x-show="!editingUser">*</span>
+              </label>
+              <input class="form-control" :class="errors.password ? 'error' : ''" type="password" 
+                     x-model="userForm.password" :placeholder="editingUser ? 'Dejar en blanco para no cambiar' : 'Mínimo 6 caracteres'" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+              <span x-show="errors.password" style="color:#dc2626;font-size:0.875rem;display:block;margin-top:0.25rem;">
+                <i class="fas fa-exclamation-circle"></i> <span x-text="errors.password"></span>
+              </span>
+              <small x-show="editingUser" style="color:var(--gray-500);font-size:0.75rem;display:block;margin-top:0.25rem;">
+                Dejar en blanco si no deseas cambiar la contraseña
+              </small>
+            </div>
+
+            <!-- CAMPO DE CONFIRMAR CONTRASEÑA - SOLO PARA NUEVOS USUARIOS -->
+            <div style="margin-bottom:1.5rem;" x-show="!editingUser">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-key"></i> Confirmar Contraseña <span style="color:#dc2626;">*</span>
+              </label>
+              <input class="form-control" :class="errors.confirm_password ? 'error' : ''" type="password" 
+                     x-model="userForm.confirm_password" placeholder="Repita la contraseña" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+              <span x-show="errors.confirm_password" style="color:#dc2626;font-size:0.875rem;display:block;margin-top:0.25rem;">
+                <i class="fas fa-exclamation-circle"></i> <span x-text="errors.confirm_password"></span>
+              </span>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+                <i class="fas fa-toggle-on"></i> Estado
+              </label>
+              <div style="display:flex;gap:1rem;margin-top:0.5rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                  <input type="radio" x-model="userForm.status" value="active" style="accent-color:var(--primary);">
+                  <span>Activo</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                  <input type="radio" x-model="userForm.status" value="inactive" style="accent-color:var(--primary);">
+                  <span>Inactivo</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Permisos adicionales -->
+        <div style="margin-top:1.5rem;padding:1rem;background:var(--gray-50);border-radius:0.5rem;">
+          <h4 style="font-size:0.875rem;font-weight:600;color:var(--gray-700);margin-bottom:0.75rem;">
+            <i class="fas fa-shield-alt"></i> Permisos Especiales
+          </h4>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+              <input type="checkbox" x-model="userForm.can_manage_users" style="accent-color:var(--primary);">
+              <span style="font-size:0.875rem;">Gestionar usuarios</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+              <input type="checkbox" x-model="userForm.can_manage_inventory" style="accent-color:var(--primary);">
+              <span style="font-size:0.875rem;">Gestionar inventario</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+              <input type="checkbox" x-model="userForm.can_view_reports" style="accent-color:var(--primary);">
+              <span style="font-size:0.875rem;">Ver reportes</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+              <input type="checkbox" x-model="userForm.can_export_data" style="accent-color:var(--primary);">
+              <span style="font-size:0.875rem;">Exportar datos</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:1rem;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 1rem 1rem;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button class="btn btn-secondary" @click="showUserModal=false" style="padding:0.675rem 1.25rem;background:white;color:var(--primary);border:1px solid var(--gray-200);border-radius:0.5rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:0.5rem;font-size:0.875rem;">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button class="btn btn-primary" @click="saveUser()" style="padding:0.675rem 1.25rem;background:var(--primary);color:white;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:0.5rem;font-size:0.875rem;">
+          <i class="fas fa-save"></i> Guardar Usuario
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Restablecer Contraseña -->
+  <div x-show="showResetPasswordModal"
+    style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);z-index:1001;"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
+    x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95">
+    <div style="max-width:480px;width:100%;background:white;border-radius:1rem;box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.25);"
+      @click.outside="showResetPasswordModal=false">
+      <div style="padding:1.5rem;border-bottom:1px solid var(--gray-200);text-align:center;">
+        <div style="width:64px;height:64px;background:#e0f2fe;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+          <i class="fas fa-key" style="font-size:1.5rem;color:#0284c7;"></i>
+        </div>
+        <h3 style="font-size:1.25rem;font-weight:600;color:var(--gray-800);margin-bottom:0.5rem;">
+          Restablecer Contraseña
+        </h3>
+        <p style="color:var(--gray-600);" 
+           x-text="`Se generará una nueva contraseña para el usuario \"${resetPasswordUser?.username || ''}\". Se enviará por email.`"></p>
+      </div>
+
+      <div style="padding:1.5rem;">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:0.5rem;padding:1rem;margin-bottom:1rem;">
+          <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:0.875rem;">
+            <div style="display:flex;">
+              <span style="color:var(--gray-600);min-width:80px;">Usuario:</span>
+              <span style="color:var(--gray-800);font-weight:500;" x-text="resetPasswordUser?.username"></span>
+            </div>
+            <div style="display:flex;">
+              <span style="color:var(--gray-600);min-width:80px;">Email:</span>
+              <span style="color:var(--gray-800);font-weight:500;" x-text="resetPasswordUser?.email"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+          <label style="display:block;font-weight:500;margin-bottom:0.5rem;color:var(--gray-700);font-size:0.875rem;">
+            <i class="fas fa-envelope"></i> Enviar notificación al email:
+          </label>
+          <input class="form-control" x-model="resetEmail" type="email" placeholder="Email para notificación" style="width:100%;padding:0.75rem 1rem;border:1px solid var(--gray-300);border-radius:0.5rem;font-size:0.875rem;">
+        </div>
+      </div>
+
+      <div style="padding:1rem;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 1rem 1rem;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button class="btn btn-secondary" @click="showResetPasswordModal=false" style="padding:0.675rem 1.25rem;background:white;color:var(--primary);border:1px solid var(--gray-200);border-radius:0.5rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:0.5rem;font-size:0.875rem;">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button class="btn btn-primary" @click="confirmResetPassword()" style="padding:0.675rem 1.25rem;background:var(--primary);color:white;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:0.5rem;font-size:0.875rem;">
+          <i class="fas fa-paper-plane"></i> Enviar Nueva Contraseña
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function usersPage() {
+    return {
+      users: [],
+      searchQuery: '',
+      roleFilter: '',
+      statusFilter: '',
+      showUserModal: false,
+      showResetPasswordModal: false,
+      showNotification: false,
+      notificationTitle: '',
+      notificationMessage: '',
+      notificationType: '',
+      editingUser: false,
+      errors: {},
+      
+      // Formulario de usuario
+      userForm: {
+        id: null,
+        full_name: '',
+        username: '',
+        email: '',
+        role: '',
+        password: '',
+        confirm_password: '',
+        status: 'active',
+        can_manage_users: false,
+        can_manage_inventory: false,
+        can_view_reports: false,
+        can_export_data: false
+      },
+      
+      // Usuario para restablecer contraseña
+      resetPasswordUser: null,
+      resetEmail: '',
+      
+      init() {
+        console.log('✅ Página de usuarios iniciada');
+        this.loadUsers();
+      },
+      
+      async loadUsers() {
+        try {
+          const res = await fetch('/api/users');
+          if (res.ok) {
+            this.users = await res.json();
+            console.log('✅ Usuarios cargados:', this.users.length);
+          } else {
+            console.error('❌ Error cargando usuarios:', res.status);
+            if (res.status === 403) {
+              alert('⚠️ Acceso denegado. Debes ser administrador para ver esta página.');
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error de red:', error);
+        }
+      },
+      
+      // Filtrado de usuarios
+      get filteredUsers() {
+        let filtered = this.users;
+        
+        if (this.searchQuery) {
+          const query = this.searchQuery.toLowerCase();
+          filtered = filtered.filter(u =>
+            u.full_name.toLowerCase().includes(query) ||
+            u.username.toLowerCase().includes(query) ||
+            u.email.toLowerCase().includes(query)
+          );
+        }
+        
+        if (this.roleFilter) {
+          filtered = filtered.filter(u => u.role === this.roleFilter);
+        }
+        
+        if (this.statusFilter) {
+          filtered = filtered.filter(u => u.status === this.statusFilter);
+        }
+        
+        return filtered;
+      },
+      
+      formatDate(dateString) {
+        if (!dateString) return 'Nunca';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      },
+      
+      getRoleLabel(role) {
+        const roles = {
+          'admin': 'Administrador',
+          'farmacia': 'Farmacia',
+          'ventas': 'Ventas',
+          'inventario': 'Inventario'
+        };
+        return roles[role] || role;
+      },
+      
+      getRoleClass(role) {
+        const classes = {
+          'admin': 'role-admin',
+          'farmacia': 'role-farmacia',
+          'ventas': 'role-ventas',
+          'inventario': 'role-inventario'
+        };
+        return classes[role] || '';
+      },
+      
+      openNewUser() {
+        console.log('📝 Abriendo formulario para nuevo usuario');
+        this.userForm = {
+          id: null,
+          full_name: '',
+          username: '',
+          email: '',
+          role: '',
+          password: '',
+          confirm_password: '',
+          status: 'active',
+          can_manage_users: false,
+          can_manage_inventory: false,
+          can_view_reports: false,
+          can_export_data: false
+        };
+        this.errors = {};
+        this.editingUser = false;
+        this.showUserModal = true;
+      },
+      
+      editUser(user) {
+        console.log('✏️ Editando usuario:', user.username);
+        this.userForm = JSON.parse(JSON.stringify(user));
+        this.userForm.password = '';
+        this.userForm.confirm_password = '';
+        this.errors = {};
+        this.editingUser = true;
+        this.showUserModal = true;
+      },
+      
+      resetPassword(user) {
+        this.resetPasswordUser = user;
+        this.resetEmail = user.email;
+        this.showResetPasswordModal = true;
+      },
+      
+      async toggleUserStatus(user) {
+        const action = user.status === 'active' ? 'desactivar' : 'activar';
+        if (!confirm(`¿Está seguro que desea ${action} al usuario "${user.username}"?`)) {
+          return;
+        }
+        
+        try {
+          const res = await fetch(`/api/users/${user.id}/toggle-status`, { 
+            method: 'PUT' 
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            const index = this.users.findIndex(u => u.id === user.id);
+            if (index !== -1) {
+              this.users[index] = data.user;
+            }
+            
+            const actionText = user.status === 'active' ? 'desactivado' : 'activado';
+            this.showNotificationMessage(
+              '✅ Estado actualizado', 
+              `Usuario "${user.username}" ha sido ${actionText}`, 
+              'success'
+            );
+          } else {
+            const error = await res.json();
+            this.showNotificationMessage('❌ Error', error.error || 'No se pudo cambiar el estado', 'error');
+          }
+        } catch (error) {
+          console.error('Error toggling user status:', error);
+          this.showNotificationMessage('❌ Error', 'No se pudo cambiar el estado del usuario', 'error');
+        }
+      },
+      
+      validateUserForm() {
+        console.log('🔍 Validando formulario...');
+        this.errors = {};
+        let isValid = true;
+        
+        // Validar nombre completo
+        if (!this.userForm.full_name || this.userForm.full_name.trim() === '') {
+          this.errors.full_name = 'El nombre completo es requerido';
+          isValid = false;
+        } else if (this.userForm.full_name.length < 3) {
+          this.errors.full_name = 'El nombre debe tener al menos 3 caracteres';
+          isValid = false;
+        }
+        
+        // Validar nombre de usuario
+        if (!this.userForm.username || this.userForm.username.trim() === '') {
+          this.errors.username = 'El nombre de usuario es requerido';
+          isValid = false;
+        } else if (this.userForm.username.length < 3) {
+          this.errors.username = 'El usuario debe tener al menos 3 caracteres';
+          isValid = false;
+        } else if (!/^[a-zA-Z0-9._-]+$/.test(this.userForm.username)) {
+          this.errors.username = 'Solo letras, números, puntos, guiones y guiones bajos';
+          isValid = false;
+        }
+        
+        // Validar email
+        if (!this.userForm.email || this.userForm.email.trim() === '') {
+          this.errors.email = 'El email es requerido';
+          isValid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email)) {
+          this.errors.email = 'El email no tiene un formato válido';
+          isValid = false;
+        }
+        
+        // Validar rol
+        if (!this.userForm.role) {
+          this.errors.role = 'Debe seleccionar un rol';
+          isValid = false;
+        }
+        
+        // Validar contraseña
+        if (!this.editingUser) {
+          // Para NUEVO usuario: contraseña requerida
+          if (!this.userForm.password) {
+            this.errors.password = 'La contraseña es requerida';
+            isValid = false;
+          } else if (this.userForm.password.length < 6) {
+            this.errors.password = 'La contraseña debe tener al menos 6 caracteres';
+            isValid = false;
+          }
+          
+          // Confirmación solo para nuevo usuario
+          if (!this.userForm.confirm_password) {
+            this.errors.confirm_password = 'Debe confirmar la contraseña';
+            isValid = false;
+          } else if (this.userForm.password !== this.userForm.confirm_password) {
+            this.errors.confirm_password = 'Las contraseñas no coinciden';
+            isValid = false;
+          }
+        } else {
+          // Para EDITAR usuario: contraseña opcional
+          if (this.userForm.password && this.userForm.password.length < 6) {
+            this.errors.password = 'La contraseña debe tener al menos 6 caracteres (dejar en blanco para no cambiar)';
+            isValid = false;
+          }
+        }
+        
+        console.log('✅ Validación completada. ¿Válido?:', isValid, 'Errores:', this.errors);
+        return isValid;
+      },
+      
+      async saveUser() {
+        console.log('💾 Guardando usuario...', this.editingUser ? 'EDITANDO' : 'CREANDO');
+        
+        this.errors = {};
+
+        if (!this.validateUserForm()) {
+          this.showNotificationMessage('❌ Error de validación', 'Por favor complete todos los campos requeridos correctamente', 'error');
+          return;
+        }
+
+        try {
+          if (this.editingUser) {
+            // Editar usuario existente
+            const userData = {
+              full_name: this.userForm.full_name,
+              username: this.userForm.username,
+              email: this.userForm.email,
+              role: this.userForm.role,
+              status: this.userForm.status,
+              can_manage_users: this.userForm.can_manage_users,
+              can_manage_inventory: this.userForm.can_manage_inventory,
+              can_view_reports: this.userForm.can_view_reports,
+              can_export_data: this.userForm.can_export_data
+            };
+            
+            // Solo incluir contraseña si se proporcionó una nueva
+            if (this.userForm.password) {
+              userData.password = this.userForm.password;
+            }
+
+            console.log('📤 Enviando datos (PUT):', userData);
+            const res = await fetch(`/api/users/${this.userForm.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(userData)
+            });
+
+            console.log('📥 Respuesta PUT:', res.status);
+            if (res.ok) {
+              const data = await res.json();
+              const index = this.users.findIndex(u => u.id === this.userForm.id);
+              if (index !== -1) {
+                this.users[index] = data.user;
+              }
+              
+              this.showUserModal = false;
+              this.showNotificationMessage(
+                '✅ ¡Éxito!', 
+                `Usuario "${this.userForm.username}" actualizado correctamente`, 
+                'success'
+              );
+            } else {
+              const error = await res.json();
+              this.showNotificationMessage('❌ Error', error.error || 'No se pudo actualizar el usuario', 'error');
+            }
+          } else {
+            // Crear nuevo usuario
+            const userData = {
+              full_name: this.userForm.full_name,
+              username: this.userForm.username,
+              email: this.userForm.email,
+              role: this.userForm.role,
+              status: this.userForm.status,
+              can_manage_users: this.userForm.can_manage_users,
+              can_manage_inventory: this.userForm.can_manage_inventory,
+              can_view_reports: this.userForm.can_view_reports,
+              can_export_data: this.userForm.can_export_data,
+              password: this.userForm.password
+            };
+
+            console.log('📤 Enviando datos (POST):', userData);
+            const res = await fetch('/api/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(userData)
+            });
+
+            console.log('📥 Respuesta POST:', res.status);
+            if (res.ok) {
+              const data = await res.json();
+              this.users.unshift(data.user);
+              
+              this.showUserModal = false;
+              this.showNotificationMessage(
+                '✅ ¡Éxito!', 
+                `Usuario "${data.user.username}" creado correctamente`, 
+                'success'
+              );
+            } else {
+              const error = await res.json();
+              this.showNotificationMessage('❌ Error', error.error || 'No se pudo crear el usuario', 'error');
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error en saveUser:', error);
+          this.showNotificationMessage('❌ Error', 'Ocurrió un error al guardar el usuario: ' + error.message, 'error');
+        }
+      },
+      
+      async confirmResetPassword() {
+        if (!this.resetPasswordUser) return;
+        
+        try {
+          const res = await fetch(`/api/users/${this.resetPasswordUser.id}/reset-password`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: this.resetEmail })
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            this.showResetPasswordModal = false;
+            this.showNotificationMessage(
+              '✅ Contraseña restablecida', 
+              data.message, 
+              'success'
+            );
+          } else {
+            const error = await res.json();
+            this.showNotificationMessage('❌ Error', error.error || 'No se pudo restablecer la contraseña', 'error');
+          }
+        } catch (error) {
+          console.error('❌ Error resetting password:', error);
+          this.showNotificationMessage('❌ Error', 'Ocurrió un error al restablecer la contraseña', 'error');
+        }
+        
+        this.resetPasswordUser = null;
+        this.resetEmail = '';
+      },
+      
+      showNotificationMessage(title, message, type = 'success') {
+        this.notificationTitle = title;
+        this.notificationMessage = message;
+        this.notificationType = type;
+        this.showNotification = true;
+        
+        setTimeout(() => {
+          this.showNotification = false;
+        }, 5000);
+      }
+    }
+  }
+</script>
+
+<style>
+.notification-success {
+  background: #d1fae5;
+  border: 1px solid #10b981;
+  color: #047857;
+}
+.notification-success i {
+  color: #10b981;
+}
+.notification-error {
+  background: #fee2e2;
+  border: 1px solid #dc2626;
+  color: #7f1d1d;
+}
+.notification-error i {
+  color: #dc2626;
+}
+.role-admin {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+.role-farmacia {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+.role-ventas {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+.role-inventario {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #c4b5fd;
+}
+.status-instock {
+  background: #d1fae5;
+  color: #065f46;
+}
+.status-outstock {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.form-control.error {
+  border-color: #dc2626 !important;
+}
+.btn:hover {
+  background: var(--gray-100);
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: translateY(0);
+}
+</style>
+{% endblock %}

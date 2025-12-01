@@ -418,6 +418,9 @@
         <a class="menu-item {% if request.endpoint == 'barcodes' %}active{% endif %}" href="{{ url_for('barcodes') }}">
           <i class="fas fa-barcode"></i><span>Códigos de Barras</span>
         </a>
+        <a class="menu-item {% if request.endpoint == 'users' %}active{% endif %}" href="{{ url_for('users') }}">
+  <i class="fas fa-users-cog"></i><span>Gestión de Usuarios</span>
+</a>
         <!-- Modal de confirmación de cierre de sesión -->
         <div x-data="{ showLogoutConfirm: false }">
           <!-- Trigger -->
