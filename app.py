@@ -428,21 +428,55 @@ def api_delete_product(pid):
 def api_checkout():
     data = request.json or {}
     items = data.get("items", [])
-    # Update stock
+    
+    # Validar que haya items
+    if not items:
+        return jsonify({"ok": False, "error": "El carrito está vacío"}), 400
+    
+    # Actualizar stock
     for it in items:
         for p in INVENTORY:
             if p["id"] == it["id"]:
-                p["stock"] = max(0, p["stock"] - int(it["qty"]))
-    total = sum(float(it["price"]) * int(it["qty"]) for it in items)
+                qty_to_subtract = int(it["qty"])
+                if p["stock"] < qty_to_subtract:
+                    return jsonify({"ok": False, "error": f"Stock insuficiente de {it['name']}. Disponible: {p['stock']}"}), 400
+                p["stock"] = max(0, p["stock"] - qty_to_subtract)
+    
+    # Calcular total (sin IVA primero)
+    subtotal = sum(float(it["price"]) * int(it["qty"]) for it in items)
+    iva = round(subtotal * 0.16, 2)
+    total = round(subtotal + iva, 2)
+    
+    # Crear recibo
     rid = str(uuid.uuid4())
     receipt = {
         "id": rid,
         "datetime": datetime.now().isoformat(),
-        "items": [{"name": it["name"], "qty": int(it["qty"]), "price": float(it["price"]), "subtotal": float(it["price"])*int(it["qty"])} for it in items],
-        "total": round(total, 2)
+        "customer": data.get("customer", ""),
+        "payment_method": data.get("payment_method", "cash"),
+        "items": [
+            {
+                "name": it["name"], 
+                "qty": int(it["qty"]), 
+                "price": float(it["price"]), 
+                "subtotal": round(float(it["price"]) * int(it["qty"]), 2)
+            } 
+            for it in items
+        ],
+        "subtotal": subtotal,
+        "iva": iva,
+        "total": total
     }
+    
+    # Guardar recibo al inicio de la lista (más recientes primero)
     RECEIPTS.insert(0, receipt)
-    return jsonify({"ok": True, "receipt_id": rid})
+    
+    return jsonify({
+        "ok": True, 
+        "receipt_id": rid,
+        "total": total,
+        "message": "Venta procesada exitosamente"
+    })
 
 @app.get("/receipt/<rid>")
 @login_required

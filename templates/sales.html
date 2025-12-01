@@ -873,12 +873,31 @@
           this.processing = true;
           
           try {
-            // Simular una llamada a la API exitosa
-            await this.simulateProcessing(1000, 'Guardando venta...');
+            // Realizar la llamada real a la API
+            const response = await fetch('/api/checkout', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                items: this.cart,
+                customer: this.customerName,
+                payment_method: this.paymentMethod
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error('Error al procesar la venta en el servidor');
+            }
+
+            const data = await response.json();
             
-            // Generar un recibo simulado
-            const receiptId = 'REC-' + Date.now().toString().slice(-10);
-            this.lastReceiptId = receiptId;
+            if (!data.ok) {
+              throw new Error(data.error || 'Error desconocido');
+            }
+
+            // Guardar el ID del recibo
+            this.lastReceiptId = data.receipt_id;
             
             // Mostrar confirmación
             this.showConfirm = true;
@@ -890,12 +909,12 @@
             this.showNotification(
               'success',
               '¡Venta Completada!',
-              `Venta #${receiptId} procesada exitosamente por $${(this.total() * 1.16).toFixed(2)}`
+              `Venta #${this.lastReceiptId} procesada exitosamente por $${(this.total() * 1.16).toFixed(2)}`
             );
             
           } catch (error) {
             console.error('Error:', error);
-            this.showNotification('error', 'Error', 'Ocurrió un error al procesar la venta');
+            this.showNotification('error', 'Error', error.message || 'Ocurrió un error al procesar la venta');
           } finally {
             this.processing = false;
           }

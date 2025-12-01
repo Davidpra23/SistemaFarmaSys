@@ -219,6 +219,10 @@
           <span>{{ r['customer'] }}</span>
         </div>
         {% endif %}
+        <div>
+          <label>Método de Pago:</label>
+          <span>{% if r.get('payment_method') == 'cash' %}Efectivo{% elif r.get('payment_method') == 'card' %}Tarjeta{% else %}{{ r.get('payment_method', 'N/A')|upper }}{% endif %}</span>
+        </div>
       </div>
 
       <table class="receipt-table">
@@ -245,7 +249,7 @@
 
     <div class="receipt-total">
       <span class="label">Total</span>
-      <span class="amount">$ {{ '%.2f'|format(r.total) }}</span>
+      <span class="amount">$ {{ '%.2f'|format(r['total']) }}</span>
     </div>
 
     <div class="receipt-footer">
