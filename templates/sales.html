@@ -1,20 +1,75 @@
 {% extends "base.html" %}
-
-{% block title %}Punto de Venta{% endblock %}
-
+{% block header_title %}Ventas{% endblock %}
 {% block content %}
-<div x-data="salesPOS()" x-init="init()" class="container-fluid p-4">
+<div x-data="salesPage()">
+  <div class="grid-sales" style="display: grid; grid-template-columns: 1fr 380px; gap: 1.5rem;">
+    <!-- Panel izquierdo: Búsqueda y listado de productos -->
+    <div class="content-section">
+      <div class="section-header">
+        <h2><i class="fas fa-cart-plus"></i> Nueva Venta</h2>
+      </div>
 
-  <div class="row">
+      <!-- Barra de búsqueda mejorada -->
+      <div class="search-bar" style="margin-bottom: 1.5rem;">
+        <div class="form-group" style="position: relative;">
+          <label><i class="fas fa-search"></i> Buscar Producto</label>
+          <input class="form-control" 
+                 placeholder="Buscar por nombre o código..." 
+                 x-model="q"
+                 style="padding-left: 2.5rem;"
+                 @keydown.enter="if(filtered().length === 1) add(filtered()[0])">
+          <i class="fas fa-search" style="position: absolute; left: 1rem; top: 2.75rem; color: var(--gray-400);"></i>
+        </div>
+      </div>
 
-    <!-- COLUMNA IZQUIERDA (Cámara + Carrito) -->
-    <div class="col-md-6 order-1">
+      <!-- Tabla de productos con mejor diseño -->
+      <div class="table-container" style="margin-bottom: 1.5rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Precio</th>
+              <th>Stock</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="p in filtered()" :key="p.id">
+              <tr>
+                <td>
+                  <div x-text="p.name" style="font-weight: 500;"></div>
+                  <small x-text="p.sku" style="color: var(--gray-500);"></small>
+                </td>
+                <td>
+                  <div class="price" style="color: var(--primary); font-weight: 600;">
+                    $ <span x-text="p.price.toFixed(2)"></span>
+                  </div>
+                </td>
+                <td>
+                  <span class="status" 
+                        :class="p.stock > 10 ? 'status-success' : (p.stock > 0 ? 'status-warning' : 'status-danger')"
+                        x-text="p.stock"></span>
+                </td>
+                <td>
+                  <button class="btn btn-primary" 
+                          @click="add(p)" 
+                          :disabled="p.stock <= 0"
+                          :title="p.stock <= 0 ? 'Sin stock disponible' : 'Agregar al carrito'">
+                    <i class="fas fa-plus"></i>
+                    <span x-show="p.stock > 0">Agregar</span>
+                    <span x-show="p.stock <= 0">Sin Stock</span>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
 
-      <!-- ESCÁNER ARRIBA - CÁMARA PEQUEÑA -->
-      <div class="card bg-dark text-white shadow-sm mb-3 overflow-hidden" style="max-width: 240px;">
-        <div
-          class="card-body p-2 text-center position-relative d-flex justify-content-center align-items-center bg-black"
-          style="min-height: 220px;">
+      <!-- Cámara de escaneo pequeña - ABAJO DE LA TABLA -->
+      <div class="card bg-dark text-white shadow-sm overflow-hidden" style="max-width: 240px; margin-top: 1.5rem;">
+        <div class="card-body p-2 text-center position-relative d-flex justify-content-center align-items-center bg-black"
+             style="min-height: 220px;">
 
           <div class="scanner-container">
             <div id="reader"></div>
@@ -22,7 +77,7 @@
 
           <!-- Botón cámara -->
           <div x-show="!scannerActive" class="position-absolute top-50 start-50 translate-middle w-100"
-            style="z-index: 20;">
+               style="z-index: 20;">
             <button class="btn btn-primary btn-sm shadow" @click="startScanner()">
               <i class="fas fa-camera me-1"></i> Activar
             </button>
@@ -30,239 +85,355 @@
 
           <!-- Feedback -->
           <div id="scan-message"
-            style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: none; z-index: 10;">
+               style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: none; z-index: 10;">
             <span class="badge bg-success p-1 fs-6 shadow">OK</span>
           </div>
         </div>
-      </div>
-
-      <!-- CARRITO ABAJO DE LA CÁMARA -->
-      <div class="card shadow h-100 border-0">
-        <div class="card-header bg-primary text-white py-3">
-          <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Carrito</h5>
-            <span class="badge bg-light text-primary fs-6" x-text="cart.reduce((a, b) => a + b.qty, 0)"></span>
-          </div>
-        </div>
-
-        <!-- Lista de Items del Carrito -->
-        <div class="card-body p-0 bg-light d-flex flex-column" style="height: calc(100vh - 280px); overflow-y: auto;">
-          
-          <!-- Estado Vacío -->
-          <div x-show="cart.length === 0" class="text-center text-muted p-5 my-auto">
-            <div class="mb-3">
-              <i class="fas fa-receipt fa-4x text-secondary opacity-25"></i>
-            </div>
-            <h5>El carrito está vacío</h5>
-            <p class="small">Escanea un producto o selecciona de la lista.</p>
-            <button class="btn btn-outline-primary mt-2" @click="focusSearch()">
-              <i class="fas fa-search me-1"></i>Buscar
-            </button>
-          </div>
-
-          <!-- Tabla de Items -->
-          <div x-show="cart.length > 0" class="flex-grow-1">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead class="table-light sticky-top">
-                  <tr>
-                    <th class="ps-3">Producto</th>
-                    <th class="text-center">Precio</th>
-                    <th class="text-center">Cantidad</th>
-                    <th class="text-center">Total</th>
-                    <th class="text-end pe-3">Eliminar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="(item, index) in cart" :key="index">
-                    <tr x-transition:enter="transition ease-out duration-300"
-                        x-transition:enter-start="opacity-0 transform -translate-y-2"
-                        x-transition:enter-end="opacity-100 transform translate-y-0">
-                      <!-- Producto -->
-                      <td class="ps-3">
-                        <div class="fw-bold text-dark" x-text="item.name"></div>
-                        <small class="text-muted" x-show="item.stock - item.qty <= 5 && item.stock - item.qty > 0">
-                          <span x-text="item.stock - item.qty"></span> restantes
-                        </small>
-                      </td>
-                      
-                      <!-- Precio Unitario -->
-                      <td class="text-center">
-                        <span class="fw-bold text-primary">$<span x-text="item.price.toFixed(2)"></span></span>
-                      </td>
-                      
-                      <!-- Cantidad -->
-                      <td class="text-center">
-                        <div class="d-flex flex-row align-items-center justify-content-center gap-1">
-                          <button class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" 
-                                  style="width: 28px; height: 28px;" 
-                                  @click="updateQty(index, -1)">
-                            <i class="fas fa-minus" style="font-size: 0.7rem;"></i>
-                          </button>
-                          
-                          <span class="fw-bold fs-6 mx-1" style="min-width: 24px;" x-text="item.qty"></span>
-                          
-                          <button class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" 
-                                  style="width: 28px; height: 28px;" 
-                                  @click="updateQty(index, 1)"
-                                  :class="{'btn-success': item.qty < item.stock, 'btn-warning': item.qty >= item.stock}">
-                            <i class="fas fa-plus" style="font-size: 0.7rem;"></i>
-                          </button>
-                        </div>
-                        
-                        <!-- Barra de progreso de stock -->
-                        <div class="progress mt-1 mx-auto" style="height: 3px; width: 60px;" x-show="item.stock > 0">
-                          <div class="progress-bar" 
-                               :class="item.qty/item.stock > 0.8 ? 'bg-warning' : 'bg-success'"
-                               :style="`width: ${(item.qty/item.stock)*100}%`"></div>
-                        </div>
-                      </td>
-                      
-                      <!-- Total -->
-                      <td class="text-center">
-                        <span class="fw-bold text-dark fs-6">$<span x-text="(item.price * item.qty).toFixed(2)"></span></span>
-                      </td>
-                      
-                      <!-- Eliminar -->
-                      <td class="text-end pe-3">
-                        <button class="btn btn-sm text-danger hover-bg-light rounded-circle p-2" 
-                                @click="removeItem(index)"
-                                style="width: 36px; height: 36px;"
-                                title="Eliminar producto">
-                          <i class="fas fa-trash-alt" style="font-size: 0.9rem;"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Footer: Totales y Acciones -->
-        <div class="card-footer bg-white border-top p-4 shadow-lg" style="z-index: 5;">
-          <div class="row mb-3">
-            <div class="col-6">
-              <div class="text-muted small">Artículos:</div>
-              <div class="fw-bold fs-5" x-text="cart.reduce((a, b) => a + b.qty, 0)"></div>
-            </div>
-            <div class="col-6 text-end">
-              <button class="btn btn-outline-danger btn-sm" @click="cart = []" x-show="cart.length > 0">
-                <i class="fas fa-trash-alt me-1"></i> Vaciar
-              </button>
-            </div>
-          </div>
-          
-          <div class="border-top pt-3">
-            <div class="d-flex justify-content-between mb-2 text-muted small">
-              <span>Subtotal:</span>
-              <span class="fw-bold">$<span x-text="totalCart()"></span></span>
-            </div>
-            
-            <div class="d-flex justify-content-between mb-2 text-muted small">
-              <span>IVA (16%):</span>
-              <span class="fw-bold">$<span x-text="(totalCart() * 0.16).toFixed(2)"></span></span>
-            </div>
-
-            <div class="d-flex justify-content-between mb-4 align-items-end">
-              <span class="h4 mb-0 text-dark">Total:</span>
-              <span class="display-6 mb-0 text-primary fw-bold">$<span x-text="(totalCart() * 1.16).toFixed(2)"></span></span>
-            </div>
-
-            <button
-              class="btn btn-success w-100 py-3 fw-bold shadow-sm text-uppercase d-flex align-items-center justify-content-center gap-2"
-              @click="checkout()" 
-              :disabled="cart.length === 0 || processing"
-              :class="{'btn-success': cart.length > 0, 'btn-secondary': cart.length === 0}">
-              <span x-show="!processing"><i class="fas fa-money-bill-wave"></i> Proceder al Pago</span>
-              <span x-show="processing"><i class="fas fa-spinner fa-spin"></i> Procesando...</span>
-            </button>
-          </div>
+        <div class="card-footer bg-dark border-top-0 p-2">
+          <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i> Escanea códigos de barras para agregar productos
+          </small>
         </div>
       </div>
     </div>
 
-    <!-- COLUMNA DERECHA (Lista de Productos) -->
-    <div class="col-md-6 order-2">
-      <!-- LISTA DE PRODUCTOS -->
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3">
-          <div class="input-group">
-            <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
-            <input type="text" id="product-search" class="form-control border-start-0 bg-light"
-              placeholder="Buscar por nombre o código..." x-model="searchQuery" @keydown.enter="manualAdd()">
-            <button class="btn btn-outline-secondary" @click="searchQuery = ''" x-show="searchQuery">
-              <i class="fas fa-times"></i>
-            </button>
+    <!-- Panel derecho: Carrito y checkout -->
+    <div class="cart-panel" style="display: flex; flex-direction: column; gap: 1rem;">
+      <!-- Carrito -->
+      <div class="content-section">
+        <div class="section-header" style="margin-bottom: 1rem;">
+          <h2><i class="fas fa-shopping-cart"></i> Carrito</h2>
+          <button class="btn btn-secondary" @click="clearCart()" x-show="cart.length > 0">
+            <i class="fas fa-trash-alt"></i> Vaciar
+          </button>
+        </div>
+
+        <div x-show="cart.length === 0" 
+             style="text-align: center; padding: 2rem; color: var(--gray-500);">
+          <i class="fas fa-shopping-cart" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+          <p>El carrito está vacío</p>
+        </div>
+
+        <template x-if="cart.length > 0">
+          <div class="cart-items" style="margin-bottom: 1rem;">
+            <template x-for="(it, idx) in cart" :key="it.id">
+              <div class="cart-item" style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--gray-200);">
+                <div style="flex: 1;">
+                  <div x-text="it.name" style="font-weight: 500;"></div>
+                  <div style="color: var(--primary); font-size: 0.875rem;">
+                    $ <span x-text="it.price.toFixed(2)"></span>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <input class="form-control" 
+                         type="number" 
+                         min="1" 
+                         :max="getMaxStock(it.id)"
+                         x-model.number="it.qty" 
+                         style="width: 5rem;">
+                  <button class="btn btn-secondary" @click="remove(idx)">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Resumen y checkout -->
+      <div class="content-section" x-show="cart.length > 0">
+        <div style="margin-bottom: 1rem;">
+          <div class="form-group">
+            <label><i class="fas fa-user"></i> Cliente (opcional)</label>
+            <input class="form-control" x-model="customerName" placeholder="Nombre del cliente">
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-money-bill"></i> Método de Pago</label>
+            <select class="form-control" x-model="paymentMethod">
+              <option value="cash">Efectivo</option>
+              <option value="card">Tarjeta</option>
+            </select>
           </div>
         </div>
 
-        <div class="card-body p-0" style="height: 450px; overflow-y: auto;">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="table-light sticky-top">
-              <tr>
-                <th class="ps-4">Producto</th>
-                <th>Código</th>
-                <th>Precio</th>
-                <th>Stock</th>
-                <th class="text-end pe-4">Acción</th>
-              </tr>
-            </thead>
+        <div class="total-section" style="background: var(--gray-50); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span>Subtotal:</span>
+            <span>$ <span x-text="total().toFixed(2)"></span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span>IVA (16%):</span>
+            <span>$ <span x-text="(total() * 0.16).toFixed(2)"></span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 600; color: var(--primary);">
+            <span>Total:</span>
+            <span>$ <span x-text="(total() * 1.16).toFixed(2)"></span></span>
+          </div>
+        </div>
 
-            <tbody>
+        <button class="btn btn-primary" 
+                style="width: 100%;" 
+                @click="processSale()"
+                :disabled="processing">
+          <i class="fas fa-check"></i>
+          <span x-text="processing ? 'Procesando...' : 'Finalizar Venta'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
 
-              <tr x-show="loading">
-                <td colspan="5" class="text-center py-5">
-                  <div class="spinner-border text-primary" role="status"></div>
-                  <p class="text-muted mt-2">Cargando inventario...</p>
-                </td>
-              </tr>
+  <!-- Modal de Confirmación de Venta -->
+  <div x-show="showConfirm" 
+       x-transition.opacity.duration.300ms
+       style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px);">
+    <div class="content-section" 
+         style="width: 100%; max-width: 500px; margin: 1rem; background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);"
+         @click.outside="showConfirm = false">
+      <div style="text-align: center; padding: 2rem;">
+        <!-- Animación de éxito -->
+        <div class="success-animation" style="margin-bottom: 1.5rem;">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="40" r="38" stroke="#10b981" stroke-width="4" fill="none" stroke-dasharray="240" stroke-dashoffset="240" style="animation: drawCircle 1s ease-out forwards 0.5s;"/>
+            <path d="M25 40 L35 50 L55 30" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="40" stroke-dashoffset="40" style="animation: drawCheck 0.5s ease-out forwards 1.5s; fill: none;"/>
+          </svg>
+        </div>
+        
+        <h3 style="margin-bottom: 0.5rem; color: #10b981;">
+          <i class="fas fa-check-circle"></i> ¡Venta Exitosa!
+        </h3>
+        <p style="color: #6b7280; margin-bottom: 2rem;">La venta se ha procesado correctamente.</p>
+        
+        <!-- Detalles de la venta -->
+        <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; text-align: left;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span style="color: #6b7280;">Número de Recibo:</span>
+            <span class="fw-bold" x-text="lastReceiptId"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span style="color: #6b7280;">Total:</span>
+            <span class="fw-bold text-primary">$<span x-text="(total() * 1.16).toFixed(2)"></span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span style="color: #6b7280;">Método de Pago:</span>
+            <span class="fw-bold text-capitalize" x-text="paymentMethod"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #6b7280;">Fecha:</span>
+            <span class="fw-bold" x-text="new Date().toLocaleDateString('es-MX')"></span>
+          </div>
+        </div>
 
-              <template x-for="p in filteredProducts()" :key="p.id">
-                <tr class="product-row" 
-                    :class="{'table-danger': p.stock <= 0, 'bg-light': p.stock <= 0}">
-                  <td class="ps-4">
-                    <div class="fw-bold text-truncate" style="max-width: 200px;" x-text="p.name"></div>
-                    <small class="text-muted" x-text="p.category"></small>
-                  </td>
-
-                  <td><span class="badge bg-light text-dark border font-monospace" x-text="p.sku"></span></td>
-
-                  <td class="fw-bold text-primary">$<span x-text="p.price.toFixed(2)"></span></td>
-
-                  <td>
-                    <span class="badge rounded-pill"
-                      :class="p.stock > 10 ? 'bg-success' : (p.stock > 0 ? 'bg-warning text-dark' : 'bg-danger')"
-                      x-text="p.stock > 0 ? p.stock : 'Agotado'"></span>
-                  </td>
-
-                  <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-outline-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center"
-                      @click="addToCart(p)" :disabled="p.stock <= 0" style="width: 32px; height: 32px; padding: 0;">
-                      <i class="fas fa-plus" style="font-size: 0.8rem;"></i>
-                    </button>
-                  </td>
-                </tr>
-              </template>
-
-              <tr x-show="!loading && filteredProducts().length === 0">
-                <td colspan="5" class="text-center py-5 text-muted">
-                  <i class="fas fa-box-open fa-3x mb-3 text-secondary opacity-25"></i>
-                  <p>No se encontraron productos</p>
-                  <button class="btn btn-outline-primary btn-sm" @click="searchQuery = ''">
-                    Limpiar búsqueda
-                  </button>
-                </td>
-              </tr>
-
-            </tbody>
-
-          </table>
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+          <button class="btn btn-secondary" @click="resetSale()" style="padding: 0.75rem 1.5rem;">
+            <i class="fas fa-cart-plus me-2"></i> Nueva Venta
+          </button>
+          <a :href="'/receipt/' + lastReceiptId" class="btn btn-primary" style="padding: 0.75rem 1.5rem;">
+            <i class="fas fa-print me-2"></i> Ver Recibo
+          </a>
         </div>
       </div>
+    </div>
+  </div>
 
+  <!-- Modal de Pago con Tarjeta -->
+  <div x-show="showCardPayment" 
+       x-transition.opacity.duration.300ms
+       style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px);">
+    <div class="content-section" 
+         style="width: 100%; max-width: 420px; margin: 1rem; background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);"
+         @click.outside="showCardPayment = false">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e5e7eb;">
+        <h3 class="mb-0" style="color: #1e40af;">
+          <i class="fas fa-credit-card me-2"></i>
+          Pago con Tarjeta
+        </h3>
+        <button @click="showCardPayment = false" class="btn btn-sm btn-light rounded-circle" style="width: 36px; height: 36px; border: none;">
+          <i class="fas fa-times text-gray-600"></i>
+        </button>
+      </div>
+
+      <div class="card-payment-container" style="padding: 0 1rem;">
+        <!-- Tarjeta 3D animada -->
+        <div class="credit-card" style="position: relative; width: 100%; height: 220px; margin-bottom: 2rem; perspective: 1000px;">
+          <div class="card-inner" :class="{'flipped': cardFlipped}" 
+               style="position: relative; width: 100%; height: 100%; transition: transform 0.8s; transform-style: preserve-3d;">
+            
+            <!-- Frente de la tarjeta -->
+            <div class="card-front" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; 
+                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 1.5rem; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div style="font-size: 1.5rem; font-weight: bold;">CARD</div>
+                <div class="chip" style="width: 50px; height: 40px; background: linear-gradient(45deg, #ffd700, #ffcc00); border-radius: 8px; position: relative; overflow: hidden;">
+                  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px);"></div>
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 1rem; font-family: 'Courier New', monospace; letter-spacing: 2px; font-size: 1.2rem;">
+                <span x-text="cardNumberDisplay"></span>
+              </div>
+              
+              <div style="display: flex; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 0.75rem; opacity: 0.8;">TITULAR</div>
+                  <div style="font-size: 0.9rem; text-transform: uppercase; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
+                       x-text="cardHolder || 'NOMBRE DEL TITULAR'"></div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; opacity: 0.8;">VÁLIDA HASTA</div>
+                  <div style="font-size: 0.9rem;" x-text="cardExpiry || 'MM/AA'"></div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Reverso de la tarjeta -->
+            <div class="card-back" style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; 
+                 background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 16px; transform: rotateY(180deg); color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+              <div style="height: 40px; background: #333; margin: 1.5rem 0;"></div>
+              <div style="background: white; height: 40px; margin: 0 2rem; display: flex; align-items: center; padding-right: 1rem;">
+                <div style="flex: 1; text-align: right;">
+                  <span style="color: #333; font-family: monospace; letter-spacing: 1px;" x-text="cardCVC || 'CVC'"></span>
+                </div>
+              </div>
+              <div style="text-align: center; margin-top: 2rem; font-size: 0.8rem; opacity: 0.8;">
+                Para dudas o aclaraciones comunicarse al 01-800-123-4567
+              </div>
+            </div>
+          </div>
+          
+          <button @click="cardFlipped = !cardFlipped" class="btn btn-sm btn-light rounded-circle" 
+                  style="position: absolute; bottom: -12px; right: 16px; width: 40px; height: 40px; z-index: 10; background: white; border: 1px solid #e5e7eb;">
+            <i class="fas fa-sync-alt text-gray-600"></i>
+          </button>
+        </div>
+
+        <!-- Formulario de tarjeta -->
+        <form @submit.prevent="processCardPayment()">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+              <i class="fas fa-user me-2 text-blue-600"></i>Titular de la Tarjeta
+            </label>
+            <input class="form-control" x-model="cardHolder" placeholder="Nombre como aparece en la tarjeta" 
+                   style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; width: 100%;"
+                   @input="validateForm()">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+              <i class="fas fa-credit-card me-2 text-blue-600"></i>Número de Tarjeta
+            </label>
+            <input class="form-control" x-model="cardNumber" placeholder="1234 5678 9012 3456" 
+                   maxlength="19" @input="formatCardNumber(); validateForm();"
+                   style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; width: 100%;">
+          </div>
+
+          <div class="row" style="margin-bottom: 1rem; display: flex; gap: 1rem;">
+            <div style="flex: 1;">
+              <div class="form-group">
+                <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+                  <i class="fas fa-calendar-alt me-2 text-blue-600"></i>Fecha de Expiración
+                </label>
+                <input class="form-control" x-model="cardExpiry" placeholder="MM/AA" 
+                       maxlength="5" @input="formatExpiry(); validateForm();"
+                       style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; width: 100%;">
+              </div>
+            </div>
+            <div style="flex: 1;">
+              <div class="form-group">
+                <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+                  <i class="fas fa-lock me-2 text-blue-600"></i>CVC
+                </label>
+                <input class="form-control" x-model="cardCVC" placeholder="123" type="password" 
+                       maxlength="3" @focus="cardFlipped = true" @input="validateForm();"
+                       style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; width: 100%;">
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <button type="button" @click="showCardPayment = false" class="btn btn-secondary" style="flex: 1; padding: 0.75rem; border-radius: 8px;">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" style="flex: 1; padding: 0.75rem; border-radius: 8px;" 
+                    :disabled="!formValid || processingCard"
+                    :class="{'btn-primary': formValid, 'btn-secondary': !formValid}">
+              <i class="fas fa-lock me-2"></i>
+              <span x-text="processingCard ? 'Procesando...' : 'Pagar $' + (total() * 1.16).toFixed(2)"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Pago en Efectivo -->
+  <div x-show="showCashPayment" 
+       x-transition.opacity.duration.300ms
+       style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100;">
+    <div class="content-section" 
+         style="width: 100%; max-width: 400px; margin: 1rem; background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);"
+         @click.outside="showCashPayment = false">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e5e7eb;">
+        <h3 class="mb-0" style="color: #059669;">
+          <i class="fas fa-money-bill-wave me-2"></i>
+          Pago en Efectivo
+        </h3>
+        <button @click="showCashPayment = false" class="btn btn-sm btn-light rounded-circle" style="width: 36px; height: 36px; border: none;">
+          <i class="fas fa-times text-gray-600"></i>
+        </button>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 2rem; padding: 0 1rem;">
+        <div class="display-4 mb-2" style="color: #059669; font-weight: 700;">$<span x-text="(total() * 1.16).toFixed(2)"></span></div>
+        <p class="text-muted" style="color: #6b7280;">Total a pagar</p>
+      </div>
+
+      <div style="padding: 0 1rem;">
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+            <i class="fas fa-money-bill me-2 text-green-600"></i>Cantidad Recibida
+          </label>
+          <input type="number" class="form-control" x-model="cashReceived" placeholder="0.00" step="0.01" min="0" 
+                 @input="calculateChange()" style="font-size: 1.5rem; text-align: center; padding: 1rem; border: 2px solid #d1d5db; border-radius: 8px; width: 100%;">
+        </div>
+
+        <div x-show="cashReceived > 0" style="margin-bottom: 1.5rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <span style="color: #374151;">Cambio:</span>
+            <span class="h4 mb-0" :class="change >= 0 ? 'text-green-600' : 'text-red-600'" style="font-weight: 700;">
+              $<span x-text="change.toFixed(2)"></span>
+            </span>
+          </div>
+          <div x-show="change < 0" class="text-danger small" style="color: #dc2626;">
+            <i class="fas fa-exclamation-triangle me-1"></i> La cantidad recibida es insuficiente
+          </div>
+          <div x-show="change >= 0" class="text-success small" style="color: #059669;">
+            <i class="fas fa-check-circle me-1"></i> Cambio calculado correctamente
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+          <!-- Botones rápidos de efectivo -->
+          <button @click="cashReceived = Math.ceil((total() * 1.16) / 100) * 100" class="btn btn-outline-success" style="flex: 1; padding: 0.5rem; border-radius: 8px;">
+            Redondear arriba
+          </button>
+          <button @click="cashReceived = (total() * 1.16).toFixed(2)" class="btn btn-outline-primary" style="flex: 1; padding: 0.5rem; border-radius: 8px;">
+            Exacto
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+          <button type="button" @click="showCashPayment = false" class="btn btn-secondary" style="flex: 1; padding: 0.75rem; border-radius: 8px;">
+            Cancelar
+          </button>
+          <button @click="processCashPayment()" class="btn btn-success" style="flex: 1; padding: 0.75rem; border-radius: 8px;" 
+                  :disabled="change < 0 || processingCash"
+                  :class="{'btn-success': change >= 0, 'btn-secondary': change < 0}">
+            <i class="fas fa-check me-2"></i>
+            <span x-text="processingCash ? 'Procesando...' : 'Confirmar Pago'"></span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -293,247 +464,579 @@
     object-fit: cover !important;
     border-radius: 12px;
   }
-  
-  .product-row {
-    cursor: pointer;
-    transition: all 0.2s ease;
+
+  /* Animaciones CSS */
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  
-  .product-row:hover:not(.table-danger) {
-    background-color: #f8f9fa !important;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
-  
-  .btn-success, .btn-primary {
-    transition: all 0.3s ease;
+
+  @keyframes drawCircle {
+    to {
+      stroke-dashoffset: 0;
+    }
   }
-  
-  .btn-success:hover, .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+
+  @keyframes drawCheck {
+    to {
+      stroke-dashoffset: 0;
+    }
   }
-  
-  /* Centrado perfecto de iconos */
-  .btn i {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
-  
-  .rounded-circle {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+
+  .card-inner.flipped {
+    transform: rotateY(180deg);
   }
+
+  .card-payment-container {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* Estilos para la tarjeta 3D */
+  .credit-card {
+    transform-style: preserve-3d;
+  }
+
+  .card-front, .card-back {
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+  }
+
+  .chip::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.4) 50%, transparent 60%);
+    border-radius: 50%;
+  }
+
+  .success-animation {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Mejoras para inputs */
+  .form-control:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+  }
+
+  /* Estilos para SweetAlert */
+  .swal2-popup {
+    border-radius: 12px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
+  .swal2-success-ring {
+    border-color: #10b981 !important;
+  }
+
+  .swal2-success-line-tip,
+  .swal2-success-line-long {
+    background-color: #10b981 !important;
+  }
+
+  /* Clases de utilidad */
+  .text-blue-600 { color: #2563eb; }
+  .text-green-600 { color: #059669; }
+  .text-gray-600 { color: #4b5563; }
+  .border-blue-500 { border-color: #3b82f6; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script>
-  function salesPOS() {
-    return {
-      searchQuery: '',
-      products: [],
-      cart: [],
-      scanCooldown: false,
-      processing: false,
-      loading: true,
-      scannerActive: false,
-      html5QrCode: null,
-
-      async init() {
-        await this.loadProducts();
-        this.startScanner();
-      },
-
-      async loadProducts() {
-        this.loading = true;
-        try {
-          const response = await fetch('/api/inventory');
-          if (response.ok) {
-            this.products = await response.json();
-          } else {
-            console.error("Error al cargar inventario");
-            this.products = [];
-          }
-        } catch (e) {
-          console.error("Error de conexión", e);
-        } finally {
-          this.loading = false;
-        }
-      },
-
-      async startScanner() {
-        if (this.html5QrCode) {
-          try {
-            await this.html5QrCode.stop();
-            await this.html5QrCode.clear();
-          } catch (err) { console.log(err); }
-        }
-
-        this.html5QrCode = new Html5Qrcode("reader");
-
-        const onScanSuccess = (decodedText, decodedResult) => {
-          if (this.scanCooldown) return;
-
-          let code = decodedText.trim();
-          let product = this.products.find(p => p.sku === code);
-
-          if (product) {
-            this.addToCart(product);
-            this.showFeedback(`✅ ${product.name}`, 'bg-success');
-            this.scanCooldown = true;
-            setTimeout(() => this.scanCooldown = false, 1500);
-          } else {
-            this.showFeedback(`❌ No encontrado: ${code}`, 'bg-danger');
-            this.scanCooldown = true;
-            setTimeout(() => this.scanCooldown = false, 2000);
-          }
-        };
-
-        const config = { fps: 10, qrbox: { width: 180, height: 180 }, aspectRatio: 1.0 };
-
-        this.html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-          .then(() => { this.scannerActive = true; })
-          .catch(err => {
-            console.error("Error iniciando cámara", err);
-            this.scannerActive = false;
-          });
-      },
-
-      filteredProducts() {
-        if (this.searchQuery === '') return this.products;
-        const q = this.searchQuery.toLowerCase();
-        return this.products.filter(p =>
-          p.name.toLowerCase().includes(q) ||
-          (p.sku && p.sku.includes(q))
-        );
-      },
-
-      addToCart(product) {
-        if (product.stock <= 0) {
-          this.showFeedback('⚠️ Sin Stock', 'bg-warning text-dark');
-          return;
-        }
-
-        let existing = this.cart.find(item => item.id === product.id);
-        if (existing) {
-          if (existing.qty < product.stock) {
-            existing.qty++;
-            this.showFeedback(`➕ ${product.name}`, 'bg-success');
-          } else {
-            this.showFeedback('⚠️ Stock Insuficiente', 'bg-warning text-dark');
-          }
-        } else {
-          this.cart.push({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            qty: 1,
-            stock: product.stock
-          });
-          this.showFeedback(`🛒 ${product.name} agregado`, 'bg-success');
-        }
-      },
-
-      updateQty(index, change) {
-        let item = this.cart[index];
-        let newQty = item.qty + change;
-        if (newQty > item.stock) {
-          this.showFeedback('⚠️ Máximo stock', 'bg-warning text-dark');
-          return;
-        }
-        if (newQty > 0) {
-          item.qty = newQty;
-          this.showFeedback(change > 0 ? `➕ ${item.name}` : `➖ ${item.name}`, 'bg-info');
-        } else {
-          this.removeItem(index);
-        }
-      },
-      
-      removeItem(index) {
-        let item = this.cart[index];
-        this.cart.splice(index, 1);
-        this.showFeedback(`🗑️ ${item.name} eliminado`, 'bg-secondary');
-      },
-
-      totalCart() {
-        return this.cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2);
-      },
-
-      showFeedback(msg, bgClass) {
-        const el = document.getElementById('scan-message');
-        el.innerHTML = `<span class="badge ${bgClass} p-2 fs-6 shadow">${msg}</span>`;
-        el.style.display = 'block';
-        setTimeout(() => { el.style.display = 'none'; }, 2000);
-      },
-      
-      focusSearch() {
-        document.getElementById('product-search').focus();
-      },
-
-      manualAdd() {
-        let filtered = this.filteredProducts();
-        if (filtered.length === 1) {
-          this.addToCart(filtered[0]);
-          this.searchQuery = '';
-        }
-      },
-
-      async checkout() {
-        this.processing = true;
-        try {
-          let res = await fetch('/api/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              items: this.cart,
-              customer: "Cliente Mostrador",
-              payment_method: "cash"
-            })
-          });
-
-          if (res.ok) {
-            let data = await res.json();
-            this.showCheckoutSuccess(data);
-            await this.loadProducts();
-            this.cart = [];
-          } else {
-            alert("Error al procesar venta");
-          }
-        } catch (e) {
-          alert("Error de conexión");
-        } finally {
-          this.processing = false;
-        }
-      },
-      
-      showCheckoutSuccess(data) {
-        const total = (this.totalCart() * 1.16).toFixed(2);
-        const itemsCount = this.cart.reduce((a, b) => a + b.qty, 0);
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script>
+    function salesPage() {
+      return {
+        q: '',
+        products: [],
+        cart: [],
+        customerName: '',
+        paymentMethod: 'cash',
+        processing: false,
+        processingCard: false,
+        processingCash: false,
+        showConfirm: false,
+        showCardPayment: false,
+        showCashPayment: false,
+        lastReceiptId: null,
+        scanCooldown: false,
+        scannerActive: false,
+        html5QrCode: null,
+        formValid: false,
         
-        Swal.fire({
-          title: '¡Venta Exitosa!',
-          html: `
-            <div class="text-start">
-              <p><strong>Recibo ID:</strong> ${data.receipt_id}</p>
-              <p><strong>Artículos:</strong> ${itemsCount}</p>
-              <p><strong>Total:</strong> $${total}</p>
-              <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
-            </div>
-          `,
-          icon: 'success',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#0d6efd'
-        });
-      }
+        // Datos para pago con tarjeta
+        cardHolder: '',
+        cardNumber: '',
+        cardNumberDisplay: '•••• •••• •••• ••••',
+        cardExpiry: '',
+        cardCVC: '',
+        cardFlipped: false,
+        
+        // Datos para pago en efectivo
+        cashReceived: 0,
+        change: 0,
+
+        init() {
+          this.products = window.INIT_PRODUCTS || [];
+          this.startScanner();
+          
+          // Inicializar con todos los modales cerrados
+          this.showCardPayment = false;
+          this.showCashPayment = false;
+          this.showConfirm = false;
+        },
+
+        filtered() {
+          if (!this.q) return this.products;
+          const query = this.q.toLowerCase();
+          return this.products.filter(p => 
+            p.name.toLowerCase().includes(query) || 
+            p.sku.toLowerCase().includes(query)
+          );
+        },
+
+        add(product) {
+          if (product.stock <= 0) {
+            this.showNotification('warning', 'Sin Stock', 'Este producto no tiene stock disponible');
+            return;
+          }
+
+          let existing = this.cart.find(item => item.id === product.id);
+          if (existing) {
+            if (existing.qty < product.stock) {
+              existing.qty++;
+              this.showFeedback(`➕ ${product.name}`, 'bg-success');
+              this.showNotification('success', 'Producto Actualizado', `Se agregó una unidad más de "${product.name}"`);
+            } else {
+              this.showNotification('warning', 'Stock Insuficiente', `Solo hay ${product.stock} unidades disponibles`);
+            }
+          } else {
+            this.cart.push({
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              qty: 1,
+              stock: product.stock
+            });
+            this.showFeedback(`🛒 ${product.name} agregado`, 'bg-success');
+            this.showNotification('success', 'Producto Agregado', `"${product.name}" se agregó al carrito`);
+          }
+        },
+
+        remove(index) {
+          const item = this.cart[index];
+          this.showConfirmation(
+            'Eliminar Producto',
+            `¿Estás seguro de eliminar "${item.name}" del carrito?`,
+            'warning',
+            () => {
+              this.cart.splice(index, 1);
+              this.showFeedback(`🗑️ ${item.name} eliminado`, 'bg-secondary');
+              this.showNotification('info', 'Producto Eliminado', `"${item.name}" fue removido del carrito`);
+            }
+          );
+        },
+
+        clearCart() {
+          if (this.cart.length === 0) return;
+          
+          this.showConfirmation(
+            'Vaciar Carrito',
+            '¿Estás seguro de vaciar todo el carrito? Esta acción no se puede deshacer.',
+            'warning',
+            () => {
+              this.cart = [];
+              this.showFeedback('Carrito vaciado', 'bg-info');
+              this.showNotification('info', 'Carrito Vacío', 'Todos los productos fueron removidos del carrito');
+            }
+          );
+        },
+
+        getMaxStock(productId) {
+          const product = this.products.find(p => p.id === productId);
+          return product ? product.stock : 0;
+        },
+
+        total() {
+          return this.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        },
+
+        processSale() {
+          if (this.cart.length === 0) {
+            this.showNotification('error', 'Carrito Vacío', 'Agrega productos al carrito antes de continuar');
+            return;
+          }
+
+          if (this.paymentMethod === 'cash') {
+            this.openCashPaymentModal();
+          } else if (this.paymentMethod === 'card') {
+            this.openCardPaymentModal();
+          }
+        },
+
+        openCashPaymentModal() {
+          // Configurar valores iniciales para efectivo
+          const total = this.total() * 1.16;
+          this.cashReceived = parseFloat(total.toFixed(2));
+          this.calculateChange();
+          this.showCashPayment = true;
+          this.showCardPayment = false;
+          this.showConfirm = false;
+        },
+
+        openCardPaymentModal() {
+          // Resetear datos de tarjeta
+          this.cardHolder = '';
+          this.cardNumber = '';
+          this.cardNumberDisplay = '•••• •••• •••• ••••';
+          this.cardExpiry = '';
+          this.cardCVC = '';
+          this.cardFlipped = false;
+          this.formValid = false;
+          this.showCardPayment = true;
+          this.showCashPayment = false;
+          this.showConfirm = false;
+        },
+
+        validateForm() {
+          // Validar todos los campos de tarjeta
+          const hasHolder = this.cardHolder.trim().length > 0;
+          const hasValidCard = this.cardNumber.replace(/\s/g, '').match(/^\d{16}$/);
+          const hasValidExpiry = this.cardExpiry.match(/^(0[1-9]|1[0-2])\/\d{2}$/);
+          const hasValidCVC = this.cardCVC.match(/^\d{3}$/);
+          
+          this.formValid = hasHolder && hasValidCard && hasValidExpiry && hasValidCVC;
+        },
+
+        async processCardPayment() {
+          if (!this.validateCard()) {
+            return;
+          }
+
+          this.processingCard = true;
+          
+          // Simular procesamiento con animación
+          await this.simulateProcessing(2000, 'Procesando pago con tarjeta...');
+          
+          // SIMULACIÓN EXITOSA - Siempre aprueba si los datos son válidos
+          await this.showProcessingAlert(
+            'Procesando Transacción',
+            'Verificando datos de la tarjeta...',
+            'success'
+          );
+          
+          // Generar número de transacción simulado
+          const transactionId = 'TX-' + Date.now().toString().slice(-8);
+          
+          // Mostrar confirmación de pago exitoso
+          await this.showProcessingAlert(
+            '¡Pago Aprobado!',
+            `Transacción completada exitosamente<br>Referencia: <strong>${transactionId}</strong>`,
+            'success'
+          );
+          
+          // Procesar la venta
+          await this.finalizeSale(transactionId);
+          this.showCardPayment = false;
+          this.processingCard = false;
+        },
+
+        validateCard() {
+          if (!this.cardHolder.trim()) {
+            this.showNotification('error', 'Datos Incompletos', 'Ingrese el nombre del titular de la tarjeta');
+            return false;
+          }
+
+          if (!this.cardNumber.replace(/\s/g, '').match(/^\d{16}$/)) {
+            this.showNotification('error', 'Tarjeta Inválida', 'Ingrese un número de tarjeta válido (16 dígitos)');
+            return false;
+          }
+
+          if (!this.cardExpiry.match(/^(0[1-9]|1[0-2])\/\d{2}$/)) {
+            this.showNotification('error', 'Fecha Inválida', 'Ingrese una fecha de expiración válida (MM/AA)');
+            return false;
+          }
+
+          if (!this.cardCVC.match(/^\d{3}$/)) {
+            this.showNotification('error', 'CVC Inválido', 'Ingrese un código CVC válido (3 dígitos)');
+            return false;
+          }
+
+          // Validar que la fecha no esté expirada
+          const [month, year] = this.cardExpiry.split('/');
+          const expiryDate = new Date(2000 + parseInt(year), parseInt(month) - 1);
+          const currentDate = new Date();
+          
+          if (expiryDate < currentDate) {
+            this.showNotification('error', 'Tarjeta Expirada', 'La fecha de expiración de la tarjeta ha pasado');
+            return false;
+          }
+
+          return true;
+        },
+
+        formatCardNumber() {
+          let numbers = this.cardNumber.replace(/\D/g, '');
+          numbers = numbers.substring(0, 16);
+          
+          // Formato visual con espacios cada 4 dígitos
+          let formatted = '';
+          for (let i = 0; i < numbers.length; i++) {
+            if (i > 0 && i % 4 === 0) formatted += ' ';
+            formatted += numbers[i];
+          }
+          
+          this.cardNumber = formatted;
+          
+          // Mostrar últimos 4 dígitos en la tarjeta
+          if (numbers.length >= 4) {
+            const last4 = numbers.slice(-4);
+            this.cardNumberDisplay = '•••• •••• •••• ' + last4;
+          } else {
+            this.cardNumberDisplay = '•••• •••• •••• ••••';
+          }
+        },
+
+        formatExpiry() {
+          let numbers = this.cardExpiry.replace(/\D/g, '');
+          if (numbers.length >= 2) {
+            this.cardExpiry = numbers.substring(0, 2) + '/' + numbers.substring(2, 4);
+          } else {
+            this.cardExpiry = numbers;
+          }
+        },
+
+        async processCashPayment() {
+          if (this.change < 0) {
+            this.showNotification('error', 'Fondos Insuficientes', 'La cantidad recibida es menor al total a pagar');
+            return;
+          }
+
+          this.processingCash = true;
+          
+          // Simular procesamiento
+          await this.simulateProcessing(1500, 'Procesando pago en efectivo...');
+          
+          await this.showProcessingAlert(
+            'Procesando Pago',
+            'Contando efectivo recibido...',
+            'info'
+          );
+          
+          // Procesar la venta
+          await this.finalizeSale();
+          this.showCashPayment = false;
+          this.processingCash = false;
+        },
+
+        calculateChange() {
+          const total = this.total() * 1.16;
+          const received = parseFloat(this.cashReceived) || 0;
+          this.change = received - total;
+        },
+
+        async finalizeSale(transactionId = null) {
+          this.processing = true;
+          
+          try {
+            // Simular una llamada a la API exitosa
+            await this.simulateProcessing(1000, 'Guardando venta...');
+            
+            // Generar un recibo simulado
+            const receiptId = 'REC-' + Date.now().toString().slice(-10);
+            this.lastReceiptId = receiptId;
+            
+            // Mostrar confirmación
+            this.showConfirm = true;
+            
+            // Limpiar datos de pago
+            this.resetPaymentData();
+            
+            // Notificar éxito
+            this.showNotification(
+              'success',
+              '¡Venta Completada!',
+              `Venta #${receiptId} procesada exitosamente por $${(this.total() * 1.16).toFixed(2)}`
+            );
+            
+          } catch (error) {
+            console.error('Error:', error);
+            this.showNotification('error', 'Error', 'Ocurrió un error al procesar la venta');
+          } finally {
+            this.processing = false;
+          }
+        },
+
+        resetPaymentData() {
+          // Limpiar datos de tarjeta
+          this.cardHolder = '';
+          this.cardNumber = '';
+          this.cardNumberDisplay = '•••• •••• •••• ••••';
+          this.cardExpiry = '';
+          this.cardCVC = '';
+          this.cardFlipped = false;
+          this.formValid = false;
+          
+          // Limpiar datos de efectivo
+          this.cashReceived = 0;
+          this.change = 0;
+        },
+
+        resetSale() {
+          this.showConfirm = false;
+          this.cart = [];
+          this.customerName = '';
+          this.paymentMethod = 'cash';
+          this.resetPaymentData();
+          
+          this.showNotification('info', 'Listo para Nueva Venta', 'Puedes comenzar una nueva venta');
+        },
+
+        // Funciones de utilidad
+        async simulateProcessing(duration, message) {
+          return new Promise(resolve => {
+            setTimeout(resolve, duration);
+          });
+        },
+
+        async showProcessingAlert(title, html, icon = 'info') {
+          return Swal.fire({
+            title: title,
+            html: html,
+            icon: icon,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            timer: 1500,
+            timerProgressBar: true,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+        },
+
+        showNotification(icon, title, text) {
+          const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+              toast.addEventListener('mouseenter', Swal.stopTimer);
+              toast.addEventListener('mouseleave', Swal.resumeTimer);
+            }
+          });
+
+          Toast.fire({
+            icon: icon,
+            title: title,
+            text: text
+          });
+        },
+
+        showConfirmation(title, text, icon, callback) {
+          Swal.fire({
+            title: title,
+            text: text,
+            icon: icon,
+            showCancelButton: true,
+            confirmButtonText: 'Sí, continuar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
+          }).then((result) => {
+            if (result.isConfirmed && callback) {
+              callback();
+            }
+          });
+        },
+
+        // Funciones para el escáner
+        async startScanner() {
+          if (this.html5QrCode) {
+            try {
+              await this.html5QrCode.stop();
+              await this.html5QrCode.clear();
+            } catch (err) { console.log(err); }
+          }
+
+          this.html5QrCode = new Html5Qrcode("reader");
+
+          const onScanSuccess = (decodedText, decodedResult) => {
+            if (this.scanCooldown) return;
+
+            let code = decodedText.trim();
+            let product = this.products.find(p => p.sku === code);
+
+            if (product) {
+              this.add(product);
+              this.showFeedback(`✅ ${product.name}`, 'bg-success');
+              this.scanCooldown = true;
+              setTimeout(() => this.scanCooldown = false, 1500);
+            } else {
+              this.showFeedback(`❌ No encontrado: ${code}`, 'bg-danger');
+              this.scanCooldown = true;
+              setTimeout(() => this.scanCooldown = false, 2000);
+            }
+          };
+
+          const config = { fps: 10, qrbox: { width: 180, height: 180 }, aspectRatio: 1.0 };
+
+          this.html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+            .then(() => { this.scannerActive = true; })
+            .catch(err => {
+              console.error("Error iniciando cámara", err);
+              this.scannerActive = false;
+            });
+        },
+
+        showFeedback(msg, bgClass) {
+          const el = document.getElementById('scan-message');
+          el.innerHTML = `<span class="badge ${bgClass} p-2 fs-6 shadow">${msg}</span>`;
+          el.style.display = 'block';
+          setTimeout(() => { el.style.display = 'none'; }, 2000);
+        }
+      };
     }
-  }
-</script>
+  </script>
+  
+  <script>
+    // Inject server-side products into a global used by the static script
+    window.INIT_PRODUCTS = {{ products|tojson | safe }};
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sales.css') }}">
 {% endblock %}
