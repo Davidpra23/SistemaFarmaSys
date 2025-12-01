@@ -2,6 +2,30 @@
 {% block header_title %}Inventario{% endblock %}
 {% block content %}
 <div x-data="inventoryPage()">
+  <!-- Notificación de éxito -->
+  <div x-show="showNotification" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0 transform translate-y-2"
+    x-transition:enter-end="opacity-100 transform translate-y-0"
+    x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 transform translate-y-0"
+    x-transition:leave-end="opacity-0 transform translate-y-2"
+    style="position:fixed;top:20px;right:20px;z-index:9999;max-width:360px;">
+    <div class="content-section" :class="notificationType === 'success' ? 'notification-success' : 'notification-error'"
+      style="padding:1rem;border-radius:0.5rem;box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <i class="fas" :class="notificationType === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
+          style="font-size:1.25rem;"></i>
+        <div>
+          <p style="font-weight:600;margin:0;" x-text="notificationTitle"></p>
+          <p style="margin:0;font-size:0.875rem;" x-text="notificationMessage"></p>
+        </div>
+        <button @click="showNotification = false" style="margin-left:auto;background:none;border:none;cursor:pointer;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Tu contenido HTML permanece igual -->
   <div class="content-section">
     <div class="section-header">
@@ -12,7 +36,7 @@
       <input class="form-control" style="max-width:420px" placeholder="Buscar por nombre, SKU o categoría" x-model="q">
       <select class="form-control" style="max-width:220px" x-model="cat">
         <option value="">Todas las categorías</option>
-        <template x-for="c in cats" :key="c">
+        <template x-for="c in categoriesList" :key="c">
           <option x-text="c"></option>
         </template>
       </select>
@@ -45,7 +69,7 @@
               </td>
               <td class="actions">
                 <button class="btn" @click="edit(p)"><i class="fas fa-edit" style="color:#4CAF50"></i></button>
-                <button class="btn" @click="del(p)"><i class="fas fa-trash" style="color:#e64c4c"></i></button>
+                <button class="btn" @click="openDeleteModal(p)"><i class="fas fa-trash" style="color:#e64c4c"></i></button>
               </td>
             </tr>
           </template>
@@ -56,7 +80,7 @@
 
   <!-- Modal de Producto -->
   <div x-show="show"
-    style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);"
+    style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);z-index:1000;"
     x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
     x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
     x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95">
@@ -74,37 +98,66 @@
       <div style="padding:1.5rem;">
         <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-group">
-            <label><i class="fas fa-box"></i> Nombre</label>
-            <input class="form-control" x-model="form.name" placeholder="Nombre del producto">
+            <label><i class="fas fa-box"></i> Nombre <span style="color:#dc2626;">*</span></label>
+            <input class="form-control" :class="errors.name ? 'error' : ''" x-model="form.name" placeholder="Nombre del producto">
+            <span x-show="errors.name" style="color:#dc2626;font-size:0.875rem;">
+              <i class="fas fa-exclamation-circle"></i> <span x-text="errors.name"></span>
+            </span>
           </div>
           <div class="form-group">
-            <label><i class="fas fa-barcode"></i> SKU</label>
+            <label><i class="fas fa-barcode"></i> SKU <span style="color:#dc2626;">*</span></label>
             <div style="display: flex; gap: 0.5rem;">
-              <input class="form-control" x-model="form.sku" placeholder="Código único">
+              <input class="form-control" :class="errors.sku ? 'error' : ''" x-model="form.sku" placeholder="Código único">
               <button class="btn btn-secondary" @click="generateSku()" title="Generar código aleatorio">
                 <i class="fas fa-magic"></i>
               </button>
             </div>
+            <span x-show="errors.sku" style="color:#dc2626;font-size:0.875rem;">
+              <i class="fas fa-exclamation-circle"></i> <span x-text="errors.sku"></span>
+            </span>
             <div style="margin-top: 0.5rem; text-align: center;" x-show="form.sku">
               <svg id="barcode-preview"></svg>
             </div>
           </div>
           <div class="form-group">
-            <label><i class="fas fa-cubes"></i> Stock</label>
-            <input class="form-control" type="number" min="0" x-model.number="form.stock" placeholder="0">
+            <label><i class="fas fa-cubes"></i> Stock <span style="color:#dc2626;">*</span></label>
+            <input class="form-control" :class="errors.stock ? 'error' : ''" type="number" min="0" x-model.number="form.stock" placeholder="0">
+            <span x-show="errors.stock" style="color:#dc2626;font-size:0.875rem;">
+              <i class="fas fa-exclamation-circle"></i> <span x-text="errors.stock"></span>
+            </span>
           </div>
           <div class="form-group">
-            <label><i class="fas fa-tag"></i> Precio</label>
-            <input class="form-control" type="number" step="0.01" min="0" x-model.number="form.price"
-              placeholder="0.00">
+            <label><i class="fas fa-tag"></i> Precio <span style="color:#dc2626;">*</span></label>
+            <input class="form-control" :class="errors.price ? 'error' : ''" type="number" step="0.01" min="0" x-model.number="form.price" placeholder="0.00">
+            <span x-show="errors.price" style="color:#dc2626;font-size:0.875rem;">
+              <i class="fas fa-exclamation-circle"></i> <span x-text="errors.price"></span>
+            </span>
           </div>
           <div class="form-group">
             <label><i class="fas fa-calendar"></i> Vencimiento</label>
-            <input class="form-control" type="date" x-model="form.expiry">
+            <input class="form-control" :class="errors.expiry ? 'error' : ''" type="date" x-model="form.expiry">
+            <span x-show="errors.expiry" style="color:#dc2626;font-size:0.875rem;">
+              <i class="fas fa-exclamation-circle"></i> <span x-text="errors.expiry"></span>
+            </span>
           </div>
           <div class="form-group">
-            <label><i class="fas fa-folder"></i> Categoría</label>
-            <input class="form-control" x-model="form.category" placeholder="Categoría del producto">
+            <label><i class="fas fa-folder"></i> Categoría <span style="color:#dc2626;">*</span></label>
+            <select class="form-control" :class="errors.category ? 'error' : ''" x-model="form.category">
+              <option value="">Seleccionar categoría</option>
+              <template x-for="c in categoriesList" :key="c">
+                <option x-text="c"></option>
+              </template>
+              <option value="nueva">Agregar nueva categoría...</option>
+            </select>
+            <span x-show="errors.category" style="color:#dc2626;font-size:0.875rem;">
+              <i class="fas fa-exclamation-circle"></i> <span x-text="errors.category"></span>
+            </span>
+            <div style="margin-top: 0.5rem;" x-show="form.category === 'nueva'">
+              <input class="form-control" placeholder="Ingrese nueva categoría" x-model="newCategory">
+              <button class="btn btn-secondary" style="margin-top: 0.5rem;" @click="addNewCategory()">
+                <i class="fas fa-plus"></i> Agregar
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -114,8 +167,65 @@
         <button class="btn btn-secondary" @click="show=false">
           <i class="fas fa-times"></i> Cancelar
         </button>
-        <button class="btn btn-primary" @click="save()">
+        <button class="btn btn-primary" @click="validateAndSave()">
           <i class="fas fa-save"></i> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Eliminación -->
+  <div x-show="showDeleteModal"
+    style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px);z-index:1001;"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
+    x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-95">
+    <div class="content-section"
+      style="max-width:480px;width:100%;background:white;border-radius:1rem;box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);"
+      @click.outside="showDeleteModal=false">
+      <div style="padding:1.5rem;border-bottom:1px solid var(--gray-200);text-align:center;">
+        <div style="width:64px;height:64px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+          <i class="fas fa-exclamation-triangle" style="font-size:1.5rem;color:#dc2626;"></i>
+        </div>
+        <h3 style="font-size:1.25rem;font-weight:600;color:var(--gray-800);margin-bottom:0.5rem;">
+          ¿Eliminar producto?
+        </h3>
+        <p style="color:var(--gray-600);" x-text="`Esta acción eliminará permanentemente el producto \"${deleteProduct?.name || ''}\". Esta acción no se puede deshacer.`"></p>
+      </div>
+
+      <div style="padding:1.5rem;">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:0.5rem;padding:1rem;">
+          <h4 style="font-size:0.875rem;font-weight:600;color:var(--gray-700);margin-bottom:0.5rem;">
+            Detalles del producto a eliminar:
+          </h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.875rem;">
+            <div>
+              <span style="color:var(--gray-600);">Nombre:</span>
+              <span style="color:var(--gray-800);font-weight:500;" x-text="deleteProduct?.name"></span>
+            </div>
+            <div>
+              <span style="color:var(--gray-600);">SKU:</span>
+              <span style="color:var(--gray-800);font-weight:500;" x-text="deleteProduct?.sku"></span>
+            </div>
+            <div>
+              <span style="color:var(--gray-600);">Categoría:</span>
+              <span style="color:var(--gray-800);font-weight:500;" x-text="deleteProduct?.category"></span>
+            </div>
+            <div>
+              <span style="color:var(--gray-600);">Stock:</span>
+              <span style="color:var(--gray-800);font-weight:500;" x-text="deleteProduct?.stock"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="padding:1rem;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 1rem 1rem;display:flex;justify-content:flex-end;gap:0.75rem;">
+        <button class="btn btn-secondary" @click="showDeleteModal=false">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button class="btn btn-danger" @click="confirmDelete()">
+          <i class="fas fa-trash"></i> Eliminar
         </button>
       </div>
     </div>
@@ -132,7 +242,32 @@
       q: '',
       cat: '',
       show: false,
+      showDeleteModal: false,
+      showNotification: false,
+      notificationTitle: '',
+      notificationMessage: '',
+      notificationType: '',
       form: {},
+      deleteProduct: null,
+      newCategory: '',
+      errors: {},
+      categoriesList: [
+        "Analgésicos",
+        "Antibióticos",
+        "Antiinflamatorios",
+        "Antidepresivos",
+        "Antihistamínicos",
+        "Antivirales",
+        "Cardiovasculares",
+        "Dermatológicos",
+        "Digestivos",
+        "Endocrinológicos",
+        "Oncológicos",
+        "Psiquiátricos",
+        "Respiratorios",
+        "Vitaminas y Suplementos",
+        "Vacunas"
+      ],
 
       init() {
         this.loadProducts();
@@ -143,6 +278,13 @@
         if (res.ok) {
           this.products = await res.json();
           this.cats = [...new Set(this.products.map(p => p.category).filter(Boolean))];
+          
+          // Agregar categorías de productos existentes que no estén en la lista predefinida
+          this.cats.forEach(category => {
+            if (!this.categoriesList.includes(category)) {
+              this.categoriesList.push(category);
+            }
+          });
         }
       },
 
@@ -167,6 +309,8 @@
 
       openNew() {
         this.form = { id: null, name: "", sku: "", stock: 0, price: 0, expiry: "", category: "" };
+        this.errors = {};
+        this.newCategory = '';
         this.show = true;
         setTimeout(() => {
           const preview = document.getElementById('barcode-preview');
@@ -176,12 +320,20 @@
 
       edit(p) {
         this.form = JSON.parse(JSON.stringify(p));
+        this.errors = {};
+        this.newCategory = '';
         this.show = true;
         this.$nextTick(() => this.renderBarcode());
       },
 
+      openDeleteModal(p) {
+        this.deleteProduct = p;
+        this.showDeleteModal = true;
+      },
+
       generateSku() {
         this.form.sku = Math.floor(10000000 + Math.random() * 90000000).toString();
+        this.errors.sku = '';
         this.renderBarcode();
       },
 
@@ -198,8 +350,114 @@
           }
         }
       },
+      
+      addNewCategory() {
+        if (this.newCategory.trim()) {
+          // Agregar la nueva categoría a la lista si no existe
+          if (!this.categoriesList.includes(this.newCategory)) {
+            this.categoriesList.push(this.newCategory);
+          }
+          // Establecer la categoría del formulario a la nueva categoría
+          this.form.category = this.newCategory;
+          this.errors.category = '';
+          // Limpiar el campo de nueva categoría
+          this.newCategory = '';
+        }
+      },
 
-      async save() {
+      validateForm() {
+        this.errors = {};
+        let isValid = true;
+
+        // Validar nombre
+        if (!this.form.name || this.form.name.trim() === '') {
+          this.errors.name = 'El nombre es requerido';
+          isValid = false;
+        } else if (this.form.name.length < 2) {
+          this.errors.name = 'El nombre debe tener al menos 2 caracteres';
+          isValid = false;
+        }
+
+        // Validar SKU
+        if (!this.form.sku || this.form.sku.trim() === '') {
+          this.errors.sku = 'El SKU es requerido';
+          isValid = false;
+        } else if (this.form.sku.length < 3) {
+          this.errors.sku = 'El SKU debe tener al menos 3 caracteres';
+          isValid = false;
+        } else {
+          // Verificar si el SKU ya existe (solo para productos nuevos)
+          if (!this.form.id) {
+            const skuExists = this.products.some(p => p.sku === this.form.sku);
+            if (skuExists) {
+              this.errors.sku = 'El SKU ya existe en el sistema';
+              isValid = false;
+            }
+          }
+        }
+
+        // Validar stock
+        if (this.form.stock === '' || this.form.stock === null || this.form.stock === undefined) {
+          this.errors.stock = 'El stock es requerido';
+          isValid = false;
+        } else if (this.form.stock < 0) {
+          this.errors.stock = 'El stock no puede ser negativo';
+          isValid = false;
+        } else if (!Number.isInteger(this.form.stock)) {
+          this.errors.stock = 'El stock debe ser un número entero';
+          isValid = false;
+        }
+
+        // Validar precio
+        if (this.form.price === '' || this.form.price === null || this.form.price === undefined) {
+          this.errors.price = 'El precio es requerido';
+          isValid = false;
+        } else if (this.form.price < 0) {
+          this.errors.price = 'El precio no puede ser negativo';
+          isValid = false;
+        } else if (this.form.price > 1000000) {
+          this.errors.price = 'El precio no puede exceder $1,000,000';
+          isValid = false;
+        }
+
+        // Validar categoría
+        if (!this.form.category || this.form.category.trim() === '' || this.form.category === 'nueva') {
+          this.errors.category = 'Debe seleccionar una categoría válida';
+          isValid = false;
+        }
+
+        // Validar fecha de vencimiento (si se proporciona)
+        if (this.form.expiry) {
+          const expiryDate = new Date(this.form.expiry);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (expiryDate < today) {
+            this.errors.expiry = 'La fecha de vencimiento no puede ser anterior a hoy';
+            isValid = false;
+          }
+        }
+
+        return isValid;
+      },
+
+      async validateAndSave() {
+        // Limpiar errores previos
+        this.errors = {};
+
+        // Validar el formulario
+        if (!this.validateForm()) {
+          this.showNotificationMessage('Error de validación', 'Por favor complete todos los campos requeridos correctamente', 'error');
+          return;
+        }
+
+        // Si la categoría es "nueva", no guardar
+        if (this.form.category === "nueva") {
+          this.errors.category = "Por favor seleccione o agregue una categoría válida";
+          this.showNotificationMessage('Error', 'Por favor seleccione una categoría válida', 'error');
+          return;
+        }
+        
         if (this.form.id) {
           const res = await fetch(`/api/inventory/${this.form.id}`, {
             method: 'PUT',
@@ -211,6 +469,9 @@
             const i = this.products.findIndex(x => x.id === item.id);
             this.products.splice(i, 1, item);
             this.show = false;
+            this.showNotificationMessage('¡Éxito!', 'Producto actualizado correctamente', 'success');
+          } else {
+            this.showNotificationMessage('Error', 'No se pudo actualizar el producto', 'error');
           }
         } else {
           const res = await fetch('/api/inventory', {
@@ -222,18 +483,86 @@
             const { item } = await res.json();
             this.products.unshift(item);
             this.show = false;
+            this.showNotificationMessage('¡Éxito!', 'Producto agregado correctamente', 'success');
+          } else {
+            this.showNotificationMessage('Error', 'No se pudo agregar el producto', 'error');
           }
         }
       },
 
-      async del(p) {
-        if (!confirm('¿Eliminar producto?')) return;
-        const res = await fetch(`/api/inventory/${p.id}`, { method: 'DELETE' });
+      showNotificationMessage(title, message, type = 'success') {
+        this.notificationTitle = title;
+        this.notificationMessage = message;
+        this.notificationType = type;
+        this.showNotification = true;
+        
+        // Auto-ocultar después de 5 segundos
+        setTimeout(() => {
+          this.showNotification = false;
+        }, 5000);
+      },
+
+      async confirmDelete() {
+        if (!this.deleteProduct) return;
+        
+        const res = await fetch(`/api/inventory/${this.deleteProduct.id}`, { method: 'DELETE' });
         if (res.ok) {
-          this.products = this.products.filter(x => x.id !== p.id);
+          const productName = this.deleteProduct.name;
+          this.products = this.products.filter(x => x.id !== this.deleteProduct.id);
+          this.showDeleteModal = false;
+          this.deleteProduct = null;
+          this.showNotificationMessage('¡Producto eliminado!', `"${productName}" ha sido eliminado del inventario`, 'success');
+        } else {
+          this.showNotificationMessage('Error', 'No se pudo eliminar el producto', 'error');
         }
       }
     }
   }
 </script>
+
+<style>
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: 1px solid #dc2626;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.error {
+  border-color: #dc2626 !important;
+}
+
+.error:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+.notification-success {
+  background: #d1fae5;
+  border: 1px solid #10b981;
+  color: #047857;
+}
+
+.notification-success i {
+  color: #10b981;
+}
+
+.notification-error {
+  background: #fee2e2;
+  border: 1px solid #dc2626;
+  color: #7f1d1d;
+}
+
+.notification-error i {
+  color: #dc2626;
+}
+
+.form-control.error {
+  border-color: #dc2626;
+}
+</style>
 {% endblock %}
