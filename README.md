@@ -39,10 +39,6 @@ El sistema permite escanear códigos QR para agilizar la venta de productos, uti
 2. Instala las dependencias de Python (Flask, etc.).
 3. Ejecuta `app.py` o `main.py` para iniciar el sistema.
 
-## Contribución
-
-Puedes contribuir mejorando el sistema, agregando nuevas funcionalidades o corrigiendo errores. Para ello, realiza un fork del repositorio y envía un pull request.
-
 ## Licencia
 
 Este proyecto es de uso libre para fines educativos y comerciales.
