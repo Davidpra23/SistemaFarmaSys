@@ -90,6 +90,18 @@
           </div>
         </div>
         <div class="card-footer bg-dark border-top-0 p-2">
+          <div style="margin-bottom: 0.5rem;">
+            <label style="color: #9ca3af; font-size: 0.75rem; display: block; margin-bottom: 0.25rem;">
+              <i class="fas fa-video me-1"></i> Cámara
+            </label>
+            <select class="form-control form-control-sm" x-model="selectedCameraId" @change="onCameraChange()"
+                    style="background: #0b0b0b; color: #e5e7eb; border: 1px solid #374151;">
+              <template x-for="cam in cameras" :key="cam.id">
+                <option :value="cam.id" x-text="cam.label || ('Cámara ' + (cameras.indexOf(cam) + 1))"></option>
+              </template>
+              <option x-show="cameras.length === 0" value="">Sin cámaras detectadas</option>
+            </select>
+          </div>
           <small class="text-muted">
             <i class="fas fa-info-circle me-1"></i> Escanea códigos de barras para agregar productos
           </small>
@@ -596,6 +608,9 @@
         scanCooldown: false,
         scannerActive: false,
         html5QrCode: null,
+        cameras: [],
+        selectedCameraId: '',
+        permissionRequested: false,
         formValid: false,
         
         // Datos para pago con tarjeta
@@ -612,6 +627,7 @@
 
         init() {
           this.products = window.INIT_PRODUCTS || [];
+          this.loadCameras();
           this.startScanner();
           
           // Inicializar con todos los modales cerrados
@@ -1034,13 +1050,54 @@
           };
 
           const config = { fps: 10, qrbox: { width: 180, height: 180 }, aspectRatio: 1.0 };
+          const cameraConfig = this.selectedCameraId
+            ? { deviceId: { exact: this.selectedCameraId } }
+            : { facingMode: "environment" };
 
-          this.html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-            .then(() => { this.scannerActive = true; })
+          this.html5QrCode.start(cameraConfig, config, onScanSuccess)
+            .then(() => {
+              this.scannerActive = true;
+              this.loadCameras();
+            })
             .catch(err => {
               console.error("Error iniciando cámara", err);
               this.scannerActive = false;
             });
+        },
+
+        async loadCameras() {
+          try {
+            const cams = await Html5Qrcode.getCameras();
+            this.cameras = Array.isArray(cams) ? cams : [];
+            if (!this.selectedCameraId && this.cameras.length > 0) {
+              this.selectedCameraId = this.cameras[0].id;
+            }
+            if (this.cameras.length === 0 && !this.permissionRequested) {
+              this.permissionRequested = true;
+              if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                  stream.getTracks().forEach(t => t.stop());
+                  const camsAfter = await Html5Qrcode.getCameras();
+                  this.cameras = Array.isArray(camsAfter) ? camsAfter : [];
+                  if (!this.selectedCameraId && this.cameras.length > 0) {
+                    this.selectedCameraId = this.cameras[0].id;
+                  }
+                } catch (err) {
+                  console.error("Permiso de cámara rechazado o bloqueado", err);
+                }
+              }
+            }
+          } catch (err) {
+            console.error("Error listando cámaras", err);
+            this.cameras = [];
+          }
+        },
+
+        onCameraChange() {
+          if (this.scannerActive) {
+            this.startScanner();
+          }
         },
 
         showFeedback(msg, bgClass) {
